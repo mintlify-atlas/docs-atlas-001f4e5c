@@ -1,0 +1,483 @@
+---
+title: "Output Components"
+description: "Guide to using different output component types in UI Metadata Framework"
+---
+
+Output components display data returned from form submissions. UiMetadataFramework.Basic provides several output components for presenting different types of data.
+
+## Text Output
+
+The text output component displays string and boolean values.
+
+**Component type:** `text`
+
+**Property types:** `string`, `bool`
+
+```csharp
+using UiMetadataFramework.Basic.Server;
+using UiMetadataFramework.Core.Binding;
+
+public class MyResponse : FormResponse
+{
+    [OutputField(Label = "User name")]
+    public string UserName { get; set; }
+
+    [OutputField(Label = "Email address")]
+    public string Email { get; set; }
+
+    [OutputField(Label = "Is active")]
+    public bool IsActive { get; set; }
+}
+```
+
+**When to use:** Displaying single-line text, names, descriptions, status messages, or boolean values.
+
+## Number Output
+
+The number output component displays numeric values.
+
+**Component type:** `number`
+
+**Property types:** `int`, `decimal`, `double`, `short`, `long`, `byte`
+
+```csharp
+using UiMetadataFramework.Basic.Server;
+using UiMetadataFramework.Core.Binding;
+
+public class MyResponse : FormResponse
+{
+    [OutputField(Label = "Total users")]
+    public int TotalUsers { get; set; }
+
+    [OutputField(Label = "Revenue")]
+    public decimal Revenue { get; set; }
+
+    [OutputField(Label = "Average rating")]
+    public double AverageRating { get; set; }
+}
+```
+
+**When to use:** Displaying counts, amounts, prices, ratings, or any numeric data.
+
+## DateTime Output
+
+The datetime output component displays date and time values.
+
+**Component type:** `datetime`
+
+**Property type:** `DateTime`
+
+```csharp
+using System;
+using UiMetadataFramework.Basic.Server;
+using UiMetadataFramework.Core.Binding;
+
+public class MyResponse : FormResponse
+{
+    [OutputField(Label = "Created at")]
+    public DateTime CreatedAt { get; set; }
+
+    [OutputField(Label = "Last login")]
+    public DateTime LastLogin { get; set; }
+}
+```
+
+**When to use:** Displaying dates, timestamps, or date/time values.
+
+## ActionList Output
+
+The action list component displays a list of clickable actions.
+
+**Component type:** `action-list`
+
+**Property type:** `ActionList`
+
+```csharp
+using UiMetadataFramework.Basic.Output.ActionList;
+using UiMetadataFramework.Basic.Output.FormLink;
+using UiMetadataFramework.Basic.Server;
+using UiMetadataFramework.Core.Binding;
+
+public class UserDetailsResponse : FormResponse
+{
+    [OutputField(Label = "User name")]
+    public string UserName { get; set; }
+
+    public ActionList Actions { get; set; }
+}
+
+[Form(Id = "user-details", Label = "User Details")]
+public class UserDetailsForm : Form<UserDetailsRequest, UserDetailsResponse>
+{
+    protected override UserDetailsResponse Handle(UserDetailsRequest request)
+    {
+        return new UserDetailsResponse
+        {
+            UserName = "John Doe",
+            Actions = new ActionList(
+                new FormLink
+                {
+                    Form = "edit-user",
+                    Label = "Edit",
+                    InputFieldValues = new Dictionary<string, object?> { { "UserId", request.UserId } }
+                },
+                new FormLink
+                {
+                    Form = "delete-user",
+                    Label = "Delete",
+                    InputFieldValues = new Dictionary<string, object?> { { "UserId", request.UserId } }
+                }
+            )
+        };
+    }
+}
+```
+
+**When to use:** Providing multiple action buttons related to the displayed data.
+
+## Table Output
+
+The table component displays collections of data in a tabular format.
+
+**Component type:** `table`
+
+**Property types:** `IEnumerable<T>`, `IList<T>`, `Array`
+
+```csharp
+using System.Collections.Generic;
+using UiMetadataFramework.Basic.Server;
+using UiMetadataFramework.Core.Binding;
+
+public class User
+{
+    public int Id { get; set; }
+    public string Name { get; set; }
+    public string Email { get; set; }
+    public bool IsActive { get; set; }
+}
+
+public class UserListResponse : FormResponse
+{
+    [OutputField] // No label needed - NoLabelByDefault = true
+    public List<User> Users { get; set; }
+}
+
+[Form(Id = "user-list", Label = "Users", PostOnLoad = true)]
+public class UserListForm : Form<UserListRequest, UserListResponse>
+{
+    protected override UserListResponse Handle(UserListRequest request)
+    {
+        return new UserListResponse
+        {
+            Users = new List<User>
+            {
+                new User { Id = 1, Name = "John Doe", Email = "john@example.com", IsActive = true },
+                new User { Id = 2, Name = "Jane Smith", Email = "jane@example.com", IsActive = false }
+            }
+        };
+    }
+}
+```
+
+**When to use:** Displaying lists of data, search results, or any tabular data.
+
+## PaginatedData Output
+
+The paginated data component displays large datasets with pagination.
+
+**Component type:** `paginated-data`
+
+**Property type:** `PaginatedData<T>`
+
+```csharp
+using System.Linq;
+using MediatR;
+using UiMetadataFramework.Basic.Inputs.Paginator;
+using UiMetadataFramework.Basic.Output.PaginatedData;
+using UiMetadataFramework.Basic.Server;
+using UiMetadataFramework.Core.Binding;
+
+public class User
+{
+    public int Id { get; set; }
+    public string Name { get; set; }
+    public string Email { get; set; }
+}
+
+public class UserSearchRequest : IRequest<UserSearchResponse>
+{
+    [InputField(Label = "Search")]
+    public string? SearchTerm { get; set; }
+
+    public Paginator? Paginator { get; set; }
+}
+
+public class UserSearchResponse : FormResponse
+{
+    [OutputField]
+    [PaginatedData(nameof(UserSearchRequest.Paginator))]
+    public PaginatedData<User> Users { get; set; }
+}
+
+[Form(Id = "user-search", Label = "Search Users", PostOnLoad = true)]
+public class UserSearchForm : Form<UserSearchRequest, UserSearchResponse>
+{
+    private readonly IUserRepository _userRepository;
+
+    public UserSearchForm(IUserRepository userRepository)
+    {
+        _userRepository = userRepository;
+    }
+
+    protected override UserSearchResponse Handle(UserSearchRequest request)
+    {
+        var pageIndex = request.Paginator?.PageIndex ?? 1;
+        var pageSize = request.Paginator?.PageSize ?? 10;
+
+        var query = _userRepository.GetAll();
+
+        if (!string.IsNullOrEmpty(request.SearchTerm))
+        {
+            query = query.Where(u => u.Name.Contains(request.SearchTerm));
+        }
+
+        var totalCount = query.Count();
+        var users = query
+            .Skip((pageIndex - 1) * pageSize)
+            .Take(pageSize)
+            .ToList();
+
+        return new UserSearchResponse
+        {
+            Users = new PaginatedData<User>
+            {
+                Results = users,
+                TotalCount = totalCount
+            }
+        };
+    }
+}
+```
+
+**When to use:** Displaying large datasets that need pagination.
+
+## FormLink Output
+
+The form link component creates a link to another form.
+
+**Component type:** `formlink`
+
+**Property type:** `FormLink`
+
+```csharp
+using System.Collections.Generic;
+using UiMetadataFramework.Basic.Output.FormLink;
+using UiMetadataFramework.Basic.Server;
+using UiMetadataFramework.Core.Binding;
+
+public class MyResponse : FormResponse
+{
+    [OutputField(Label = "View details")]
+    public FormLink DetailsLink { get; set; }
+}
+
+[Form(Id = "user-summary", Label = "User Summary")]
+public class UserSummaryForm : Form<UserSummaryRequest, UserSummaryResponse>
+{
+    protected override UserSummaryResponse Handle(UserSummaryRequest request)
+    {
+        return new UserSummaryResponse
+        {
+            DetailsLink = new FormLink
+            {
+                Form = "user-details",
+                Label = "View full details",
+                Action = FormLinkActions.Run, // or FormLinkActions.OpenModal
+                InputFieldValues = new Dictionary<string, object?>
+                {
+                    { "UserId", 123 }
+                }
+            }
+        };
+    }
+}
+```
+
+**Available actions:**
+- `FormLinkActions.Run` - Navigate to the form
+- `FormLinkActions.OpenModal` - Open the form in a modal
+
+**When to use:** Creating navigation links between forms or opening related forms.
+
+## InlineForm Output
+
+The inline form component embeds another form within the response.
+
+**Component type:** `inline-form`
+
+**Property type:** `InlineForm`
+
+```csharp
+using System.Collections.Generic;
+using UiMetadataFramework.Basic.Output.InlineForm;
+using UiMetadataFramework.Basic.Server;
+using UiMetadataFramework.Core.Binding;
+
+public class DashboardResponse : FormResponse
+{
+    [OutputField(Label = "Quick search")]
+    public InlineForm SearchForm { get; set; }
+
+    [OutputField(Label = "Statistics")]
+    public string Statistics { get; set; }
+}
+
+[Form(Id = "dashboard", Label = "Dashboard", PostOnLoad = true)]
+public class DashboardForm : Form<DashboardRequest, DashboardResponse>
+{
+    protected override DashboardResponse Handle(DashboardRequest request)
+    {
+        return new DashboardResponse
+        {
+            SearchForm = new InlineForm
+            {
+                Form = "user-search",
+                InputFieldValues = new Dictionary<string, object?>
+                {
+                    { "SearchTerm", "" }
+                }
+            },
+            Statistics = "Total users: 1,234"
+        };
+    }
+}
+```
+
+**When to use:** Embedding a form within another form's response, creating composite views.
+
+## Complete Example
+
+Here's a complete example showing multiple output components:
+
+```csharp
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using MediatR;
+using UiMetadataFramework.Basic.Output.ActionList;
+using UiMetadataFramework.Basic.Output.FormLink;
+using UiMetadataFramework.Basic.Server;
+using UiMetadataFramework.Core.Binding;
+
+public class OrderItem
+{
+    public string ProductName { get; set; }
+    public int Quantity { get; set; }
+    public decimal Price { get; set; }
+    public decimal Total => Quantity * Price;
+}
+
+public class OrderDetailsRequest : IRequest<OrderDetailsResponse>
+{
+    [InputField(Hidden = true)]
+    public int OrderId { get; set; }
+}
+
+public class OrderDetailsResponse : FormResponse
+{
+    // Text outputs
+    [OutputField(Label = "Order number")]
+    public string OrderNumber { get; set; }
+
+    [OutputField(Label = "Customer name")]
+    public string CustomerName { get; set; }
+
+    // DateTime output
+    [OutputField(Label = "Order date")]
+    public DateTime OrderDate { get; set; }
+
+    // Number outputs
+    [OutputField(Label = "Total items")]
+    public int TotalItems { get; set; }
+
+    [OutputField(Label = "Total amount")]
+    public decimal TotalAmount { get; set; }
+
+    // Table output
+    [OutputField(Label = "Order items")]
+    public List<OrderItem> Items { get; set; }
+
+    // ActionList output
+    public ActionList Actions { get; set; }
+}
+
+[Form(Id = "order-details", Label = "Order Details")]
+public class OrderDetailsForm : Form<OrderDetailsRequest, OrderDetailsResponse>
+{
+    protected override OrderDetailsResponse Handle(OrderDetailsRequest request)
+    {
+        var items = new List<OrderItem>
+        {
+            new OrderItem { ProductName = "Widget A", Quantity = 2, Price = 29.99m },
+            new OrderItem { ProductName = "Widget B", Quantity = 1, Price = 49.99m },
+            new OrderItem { ProductName = "Widget C", Quantity = 3, Price = 19.99m }
+        };
+
+        return new OrderDetailsResponse
+        {
+            OrderNumber = "ORD-12345",
+            CustomerName = "John Doe",
+            OrderDate = DateTime.UtcNow.AddDays(-2),
+            TotalItems = items.Sum(i => i.Quantity),
+            TotalAmount = items.Sum(i => i.Total),
+            Items = items,
+            Actions = new ActionList(
+                new FormLink
+                {
+                    Form = "edit-order",
+                    Label = "Edit Order",
+                    InputFieldValues = new Dictionary<string, object?> { { "OrderId", request.OrderId } }
+                },
+                new FormLink
+                {
+                    Form = "cancel-order",
+                    Label = "Cancel Order",
+                    InputFieldValues = new Dictionary<string, object?> { { "OrderId", request.OrderId } }
+                },
+                new FormLink
+                {
+                    Form = "order-list",
+                    Label = "Back to Orders"
+                }
+            )
+        };
+    }
+}
+```
+
+## Hiding Labels
+
+Some output components (like `table` and `paginated-data`) have `NoLabelByDefault = true`. To add a label, set it explicitly:
+
+```csharp
+[OutputField(Label = "Results")] // Explicitly add a label
+public List<User> Users { get; set; }
+```
+
+To hide labels for other components, set `Label` to an empty string or null:
+
+```csharp
+[OutputField(Label = "")] // No label
+public string Message { get; set; }
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Event Handlers" icon="bolt" href="/guides/event-handlers">
+    Add interactivity with event handlers
+  </Card>
+  <Card title="Custom Properties" icon="wrench" href="/guides/custom-properties">
+    Extend components with custom metadata
+  </Card>
+</CardGroup>

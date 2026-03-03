@@ -1,0 +1,369 @@
+---
+title: Output Components
+description: API reference for Basic output components in UI Metadata Framework
+---
+
+## Overview
+
+Output components are used to display data in form responses. The UI Metadata Framework Basic package provides several built-in output component bindings and types.
+
+## StringOutputComponentBinding
+
+Component binding for text output fields.
+
+<ParamField path="componentType" type="string" default="text">
+  The client-side component type identifier
+</ParamField>
+
+<ParamField path="serverTypes" type="Type[]">
+  Supported server-side C# types:
+  - `typeof(string)`
+  - `typeof(bool)`
+</ParamField>
+
+### Usage
+
+```csharp
+public class MyForm : Form<MyRequest, MyResponse>
+{
+    public class MyResponse
+    {
+        public string Message { get; set; }
+        public bool Success { get; set; }
+    }
+}
+```
+
+String and boolean types are automatically mapped to the `text` output component.
+
+## DateTimeOutputComponentBinding
+
+Component binding for date and time output fields.
+
+<ParamField path="componentType" type="string" default="datetime">
+  The client-side component type identifier
+</ParamField>
+
+<ParamField path="serverType" type="Type" default="typeof(DateTime)">
+  The server-side C# type this component binds to
+</ParamField>
+
+### Usage
+
+```csharp
+public class MyForm : Form<MyRequest, MyResponse>
+{
+    public class MyResponse
+    {
+        public DateTime CreatedAt { get; set; }
+        public DateTime? UpdatedAt { get; set; }
+    }
+}
+```
+
+## TableOutputComponentBinding
+
+Component binding for rendering collections as tables.
+
+<ParamField path="componentType" type="string" default="table">
+  The client-side component type identifier
+</ParamField>
+
+<ParamField path="serverTypes" type="Type[]">
+  Supported server-side C# types:
+  - `typeof(IEnumerable<>)`
+  - `typeof(IList<>)`
+  - `typeof(Array)`
+</ParamField>
+
+<ParamField path="NoLabelByDefault" type="bool" default="true">
+  Tables have no label by default unless explicitly specified
+</ParamField>
+
+### Usage
+
+```csharp
+public class MyForm : Form<MyRequest, MyResponse>
+{
+    public class MyResponse
+    {
+        public IEnumerable<UserDto> Users { get; set; }
+        public List<ProductDto> Products { get; set; }
+    }
+}
+
+public class UserDto
+{
+    public int Id { get; set; }
+    public string Name { get; set; }
+    public string Email { get; set; }
+}
+```
+
+All properties of the items in the collection are automatically rendered as table columns.
+
+## ActionList
+
+Represents a list of actions that the user can perform.
+
+<ParamField path="Actions" type="IList<FormLink>">
+  List of actions available to the user
+</ParamField>
+
+### Properties
+
+<ParamField path="componentType" type="string" default="action-list">
+  The client-side component type identifier
+</ParamField>
+
+### Usage
+
+```csharp
+public class MyForm : Form<MyRequest, MyResponse>
+{
+    public class MyResponse
+    {
+        public ActionList AvailableActions { get; set; }
+    }
+    
+    protected override MyResponse Handle(MyRequest request)
+    {
+        return new MyResponse
+        {
+            AvailableActions = new ActionList(
+                new FormLink
+                {
+                    Form = "EditUser",
+                    Label = "Edit",
+                    Action = FormLinkActions.OpenModal,
+                    InputFieldValues = new Dictionary<string, object?>
+                    {
+                        { "UserId", request.UserId }
+                    }
+                },
+                new FormLink
+                {
+                    Form = "DeleteUser",
+                    Label = "Delete",
+                    Action = FormLinkActions.Run
+                }
+            )
+        };
+    }
+}
+```
+
+## FormLink
+
+Represents a reference to a form that can be invoked by the user.
+
+<ParamField path="Form" type="string" required>
+  Name of the form to link to
+</ParamField>
+
+<ParamField path="Label" type="string?">
+  Label to be shown on the client when rendering the link
+</ParamField>
+
+<ParamField path="Action" type="string?">
+  What to do when the user clicks on the link. See `FormLinkActions` for available options
+</ParamField>
+
+<ParamField path="InputFieldValues" type="IDictionary<string, object?>?">
+  Values for the input fields of the invoked form
+</ParamField>
+
+### Properties
+
+<ParamField path="componentType" type="string" default="formlink">
+  The client-side component type identifier
+</ParamField>
+
+### Usage
+
+```csharp
+public class MyResponse
+{
+    public FormLink EditLink { get; set; }
+}
+
+var response = new MyResponse
+{
+    EditLink = new FormLink
+    {
+        Form = "EditUser",
+        Label = "Edit User",
+        Action = FormLinkActions.OpenModal,
+        InputFieldValues = new Dictionary<string, object?>
+        {
+            { "UserId", 123 }
+        }
+    }
+};
+```
+
+## FormLinkActions
+
+Constants defining available actions for FormLink.
+
+<ParamField path="Run" type="const string" default="run">
+  Form should be run immediately after user clicks the link. User cannot modify InputFieldValues
+</ParamField>
+
+<ParamField path="OpenModal" type="const string" default="open-modal">
+  Form should be opened in a modal, allowing user to review before running
+</ParamField>
+
+<ParamField path="Redirect" type="const string" default="redirect">
+  Link behaves as a regular link, redirecting to the specified form
+</ParamField>
+
+### Usage
+
+```csharp
+var link = new FormLink
+{
+    Form = "ConfirmAction",
+    Action = FormLinkActions.OpenModal // Opens in modal
+};
+
+var quickAction = new FormLink
+{
+    Form = "QuickDelete",
+    Action = FormLinkActions.Run // Executes immediately
+};
+
+var navigation = new FormLink
+{
+    Form = "UserDetails",
+    Action = FormLinkActions.Redirect // Navigates to form
+};
+```
+
+## InlineForm
+
+Represents a form that will be rendered inline as part of the response.
+
+<ParamField path="Form" type="string" required>
+  Name of the form to render
+</ParamField>
+
+<ParamField path="InputFieldValues" type="IDictionary<string, object?>?">
+  Values for the input fields of the form
+</ParamField>
+
+### Properties
+
+<ParamField path="componentType" type="string" default="inline-form">
+  The client-side component type identifier
+</ParamField>
+
+### Usage
+
+```csharp
+public class MyForm : Form<MyRequest, MyResponse>
+{
+    public class MyResponse
+    {
+        public InlineForm NestedForm { get; set; }
+    }
+    
+    protected override MyResponse Handle(MyRequest request)
+    {
+        return new MyResponse
+        {
+            NestedForm = new InlineForm
+            {
+                Form = "AddressForm",
+                InputFieldValues = new Dictionary<string, object?>
+                {
+                    { "Country", "USA" },
+                    { "State", "CA" }
+                }
+            }
+        };
+    }
+}
+```
+
+## PaginatedData&lt;T&gt;
+
+Represents a subset of data from a data store, corresponding to a single page.
+
+<ParamField path="Results" type="IEnumerable<T>?">
+  Items in the current page
+</ParamField>
+
+<ParamField path="TotalCount" type="int">
+  Total number of matching items in the data store (across all pages)
+</ParamField>
+
+### Properties
+
+<ParamField path="componentType" type="string" default="paginated-data">
+  The client-side component type identifier
+</ParamField>
+
+<ParamField path="NoLabelByDefault" type="bool" default="true">
+  Paginated data has no label by default unless explicitly specified
+</ParamField>
+
+### Configuration Attributes
+
+#### PaginatedDataAttribute
+
+<ParamField path="Paginator" type="string" required>
+  Name of the input field which controls the pagination parameters
+</ParamField>
+
+### Usage
+
+```csharp
+public class SearchUsers : Form<SearchRequest, SearchResponse>
+{
+    public class SearchRequest
+    {
+        public Paginator Paginator { get; set; }
+        public string Query { get; set; }
+    }
+    
+    public class SearchResponse
+    {
+        [PaginatedData(nameof(SearchRequest.Paginator))]
+        public PaginatedData<UserDto> Results { get; set; }
+    }
+    
+    protected override SearchResponse Handle(SearchRequest request)
+    {
+        var pageIndex = request.Paginator.PageIndex ?? 0;
+        var pageSize = request.Paginator.PageSize ?? 10;
+        
+        var query = dbContext.Users
+            .Where(u => u.Name.Contains(request.Query));
+        
+        var totalCount = query.Count();
+        var results = query
+            .Skip(pageIndex * pageSize)
+            .Take(pageSize)
+            .ToList();
+        
+        return new SearchResponse
+        {
+            Results = new PaginatedData<UserDto>
+            {
+                Results = results,
+                TotalCount = totalCount
+            }
+        };
+    }
+}
+
+public class UserDto
+{
+    public int Id { get; set; }
+    public string Name { get; set; }
+    public string Email { get; set; }
+}
+```
+
+The `PaginatedDataAttribute` links the output field to the paginator input field, enabling the client to automatically handle pagination controls.

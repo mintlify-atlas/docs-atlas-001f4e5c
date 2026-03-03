@@ -1,80 +1,271 @@
 ---
-title: "Quickstart"
-description: "Start building awesome documentation in minutes"
+title: Quickstart
+description: Build your first UIMF form in under 5 minutes
 ---
 
-## Get started in three steps
+This guide will walk you through creating your first UI Metadata Framework form. You'll build a simple calculator that adds two numbers, and see how UIMF automatically generates metadata for your frontend.
 
-Get your documentation site running locally and make your first customization.
+## Prerequisites
 
-### Step 1: Set up your local environment
+Before you begin, make sure you have:
 
-<AccordionGroup>
-  <Accordion icon="copy" title="Clone your docs locally">
-    During the onboarding process, you created a GitHub repository with your docs content if you didn't already have one. You can find a link to this repository in your [dashboard](https://dashboard.mintlify.com).
-    
-    To clone the repository locally so that you can make and preview changes to your docs, follow the [Cloning a repository](https://docs.github.com/en/repositories/creating-and-managing-repositories/cloning-a-repository) guide in the GitHub docs.
-  </Accordion>
-  <Accordion icon="rectangle-terminal" title="Start the preview server">
-    1. Install the Mintlify CLI: `npm i -g mint`
-    2. Navigate to your docs directory and run: `mint dev`
-    3. Open `http://localhost:3000` to see your docs live!
-    
-    <Tip>Your preview updates automatically as you edit files.</Tip>
-  </Accordion>
-</AccordionGroup>
+- .NET Standard 2.0 or .NET Framework 4.7.2+ installed
+- A C# project (console app, web API, etc.)
+- Basic familiarity with C# and attributes
 
-### Step 2: Deploy your changes
+## Step 1: Install the NuGet packages
 
-<AccordionGroup>
-  <Accordion icon="github" title="Install our GitHub app">
-    Install the Mintlify GitHub app from your [dashboard](https://dashboard.mintlify.com/settings/organization/github-app).
-    
-    Our GitHub app automatically deploys your changes to your docs site, so you don't need to manage deployments yourself.
-</Accordion>
-<Accordion icon="palette" title="Update your site name and colors">
-    For a first change, let's update the name and colors of your docs site.
+<Steps>
+  <Step title="Install UiMetadataFramework.Core">
+    This package provides the core framework functionality:
 
-    1. Open `docs.json` in your editor.
-    2. Change the `"name"` field to your project name.
-    3. Update the `"colors"` to match your brand.
-    4. Save and see your changes instantly at `http://localhost:3000`.
+    <CodeGroup>
+    ```bash .NET CLI
+    dotnet add package UiMetadataFramework.Core
+    ```
 
-    <Tip>Try changing the primary color to see an immediate difference!</Tip>
-  </Accordion>
-</AccordionGroup>
+    ```bash Package Manager
+    Install-Package UiMetadataFramework.Core
+    ```
 
-### Step 3: Go live
+    ```xml PackageReference
+    <PackageReference Include="UiMetadataFramework.Core" Version="1.0.24-alpha" />
+    ```
+    </CodeGroup>
+  </Step>
 
-<Accordion icon="rocket" title="Publish your docs">
-  1. Commit and push your changes.
-  2. Your docs will update and be live in moments!
-</Accordion>
+  <Step title="Install UiMetadataFramework.Basic">
+    This package provides basic input/output components:
+
+    <CodeGroup>
+    ```bash .NET CLI
+    dotnet add package UiMetadataFramework.Basic
+    ```
+
+    ```bash Package Manager
+    Install-Package UiMetadataFramework.Basic
+    ```
+
+    ```xml PackageReference
+    <PackageReference Include="UiMetadataFramework.Basic" Version="1.0.18-alpha" />
+    ```
+    </CodeGroup>
+  </Step>
+</Steps>
+
+## Step 2: Create your first form
+
+Let's create a simple form that adds two numbers. Create a new C# file called `AddNumbers.cs`:
+
+```csharp AddNumbers.cs
+using UiMetadataFramework.Basic.Server;
+using UiMetadataFramework.Core.Binding;
+using MediatR;
+
+[Form(Label = "Add 2 numbers", SubmitButtonLabel = "Submit", PostOnLoad = false)]
+public class AddNumbers : Form<AddNumbers.Request, AddNumbers.Response>
+{
+    public class Response : FormResponse
+    {
+        [OutputField(Label = "Result of your calculation")]
+        public long Result { get; set; }
+    }
+
+    public class Request : IRequest<Response>
+    {
+        [InputField(Label = "First number")]
+        public int Number1 { get; set; }
+
+        [InputField(Label = "Second number")]
+        public int Number2 { get; set; }
+    }
+
+    protected override Response Handle(Request message)
+    {
+        return new Response
+        {
+            Result = message.Number1 + message.Number2
+        };
+    }
+}
+```
+
+<Tip>
+Notice how the form is self-contained. The `Request` class defines inputs, the `Response` class defines outputs, and the `Handle` method implements the business logic.
+</Tip>
+
+## Step 3: Understanding the code
+
+Let's break down what each part does:
+
+### Form attribute
+
+```csharp
+[Form(Label = "Add 2 numbers", SubmitButtonLabel = "Submit", PostOnLoad = false)]
+```
+
+The `FormAttribute` decorates your form class and defines:
+- **Label** - The display name shown to users
+- **SubmitButtonLabel** - Text for the submit button (optional)
+- **PostOnLoad** - Whether to auto-submit the form when loaded (useful for reports)
+
+### Request class
+
+```csharp
+public class Request : IRequest<Response>
+{
+    [InputField(Label = "First number")]
+    public int Number1 { get; set; }
+
+    [InputField(Label = "Second number")]
+    public int Number2 { get; set; }
+}
+```
+
+The `Request` class defines your form's inputs. Each property decorated with `[InputField]` becomes an input field in the UI.
+
+### Response class
+
+```csharp
+public class Response : FormResponse
+{
+    [OutputField(Label = "Result of your calculation")]
+    public long Result { get; set; }
+}
+```
+
+The `Response` class defines your form's outputs. Properties decorated with `[OutputField]` are displayed after the form is submitted.
+
+### Handle method
+
+```csharp
+protected override Response Handle(Request message)
+{
+    return new Response
+    {
+        Result = message.Number1 + message.Number2
+    };
+}
+```
+
+This method contains your business logic. It receives the request and returns the response.
+
+## Step 4: Generate metadata
+
+To generate metadata for your form, you need to register it with the `MetadataBinder` and `FormRegister`:
+
+```csharp
+using UiMetadataFramework.Basic;
+using UiMetadataFramework.Basic.Server;
+using UiMetadataFramework.Core.Binding;
+
+// Create metadata binder
+var binder = new MetadataBinder(new DefaultDependencyInjectionContainer());
+
+// Register the Basic component library
+binder.RegisterAssembly(typeof(UiMetadataFramework.Basic.Server.FormResponse).Assembly);
+
+// Create form register and register your form
+var formRegister = new FormRegister(binder);
+formRegister.RegisterForm(typeof(AddNumbers));
+
+// Get the metadata
+var formInfo = formRegister.GetFormInfo(typeof(AddNumbers));
+var metadata = formInfo.Metadata;
+```
+
+## Step 5: View the generated metadata
+
+The `metadata` object contains all the information your frontend needs to render the form. Here's what it looks like as JSON:
+
+```json
+{
+    "id": "AddNumbers",
+    "label": "Add 2 numbers",
+    "inputFields": [
+        {
+            "id": "Number1",
+            "label": "First number",
+            "type": "number",
+            "required": true,
+            "hidden": false,
+            "orderIndex": 0
+        },
+        {
+            "id": "Number2",
+            "label": "Second number",
+            "type": "number",
+            "required": true,
+            "hidden": false,
+            "orderIndex": 0
+        }
+    ],
+    "outputFields": [
+        {
+            "id": "Result",
+            "label": "Result of your calculation",
+            "type": "number",
+            "hidden": false,
+            "orderIndex": 0
+        }
+    ],
+    "postOnLoad": false,
+    "postOnLoadValidation": true
+}
+```
+
+<Note>
+The `type` field is automatically inferred from the C# property type. For example, `int` and `long` properties become `"type": "number"`.
+</Note>
+
+## Step 6: How the client uses this metadata
+
+Your frontend client receives this metadata and uses it to:
+
+1. **Render input fields** - Create two numeric input fields labeled "First number" and "Second number"
+2. **Handle submission** - POST the user's input values to your API endpoint
+3. **Display the result** - Show the calculated result in an output field
+
+For example, using the [uimf-svelte](https://github.com/unops/uimf-svelte) client:
+
+```typescript
+import { FormMetadata } from 'uimf-core';
+
+// Fetch metadata from your API
+const response = await fetch('/api/metadata/AddNumbers');
+const metadataJson = await response.json();
+
+// Create FormMetadata instance
+const formMetadata = new FormMetadata(metadataJson);
+
+// The client renders the form based on this metadata
+// Input fields are created from formMetadata.inputFields
+// Output fields are created from formMetadata.outputFields
+```
 
 ## Next steps
 
-Now that you have your docs running, explore these key features:
+Congratulations! You've created your first UIMF form. Here's what to explore next:
 
 <CardGroup cols={2}>
-
-<Card title="Write Content" icon="pen-to-square" href="/essentials/markdown">
-  Learn MDX syntax and start writing your documentation.
-</Card>
-
-<Card title="Customize style" icon="palette" href="/essentials/settings">
-  Make your docs match your brand perfectly.
-</Card>
-
-<Card title="Add code examples" icon="square-code" href="/essentials/code">
-  Include syntax-highlighted code blocks.
-</Card>
-
-<Card title="API documentation" icon="code" href="/api-reference/introduction">
-  Auto-generate API docs from OpenAPI specs.
-</Card>
-
+  <Card title="Core concepts" icon="book" href="/concepts/overview">
+    Learn about forms, fields, and metadata binding
+  </Card>
+  <Card title="Input components" icon="keyboard" href="/guides/input-components">
+    Explore different input field types and options
+  </Card>
+  <Card title="Output components" icon="display" href="/guides/output-components">
+    Learn how to format and display form results
+  </Card>
+  <Card title="Event handlers" icon="bolt" href="/guides/event-handlers">
+    Add dynamic behavior to your forms
+  </Card>
 </CardGroup>
 
-<Note>
-  **Need help?** See our [full documentation](https://mintlify.com/docs) or join our [community](https://mintlify.com/community).
-</Note>
+<Tip>
+Try modifying the `AddNumbers` form to:
+- Add validation rules using the `Required` parameter
+- Add more input fields
+- Change the output format
+- Set `PostOnLoad = true` to auto-submit the form
+</Tip>

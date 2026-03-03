@@ -1,0 +1,492 @@
+---
+title: "Custom Properties"
+description: "Adding custom properties to forms and fields in UI Metadata Framework"
+---
+
+Custom properties allow you to extend forms and fields with additional metadata beyond the standard UIMF properties. This is useful for adding client-specific configuration, styling hints, or any other metadata your application needs.
+
+## Understanding Custom Properties
+
+Custom properties are key-value pairs that are included in the form and field metadata sent to the client. They allow you to:
+
+- Add application-specific configuration to forms and fields
+- Pass styling or display hints to the client
+- Include additional validation rules
+- Store arbitrary metadata for client-side processing
+
+## Adding Custom Properties to Fields
+
+UIMetadataFramework.Core provides built-in attributes for common property types.
+
+### String Properties
+
+Use `StringPropertyAttribute` to add string values:
+
+```csharp
+using UiMetadataFramework.Core.Binding;
+
+public class MyRequest
+{
+    [InputField(Label = "Username")]
+    [StringProperty("placeholder", "Enter your username")]
+    [StringProperty("css-class", "primary-input")]
+    public string? Username { get; set; }
+}
+```
+
+### Integer Properties
+
+Use `IntPropertyAttribute` to add integer values:
+
+```csharp
+using UiMetadataFramework.Core.Binding;
+
+public class MyRequest
+{
+    [InputField(Label = "Age")]
+    [IntProperty("min-value", 18)]
+    [IntProperty("max-value", 100)]
+    public int? Age { get; set; }
+}
+```
+
+### Boolean Properties
+
+Use `BooleanPropertyAttribute` to add boolean values:
+
+```csharp
+using UiMetadataFramework.Core.Binding;
+
+public class MyRequest
+{
+    [InputField(Label = "Email")]
+    [BooleanProperty("auto-focus", true)]
+    [BooleanProperty("spell-check", false)]
+    public string? Email { get; set; }
+}
+```
+
+## Adding Multiple Properties
+
+You can add multiple custom properties to a single field:
+
+```csharp
+using UiMetadataFramework.Core.Binding;
+using UiMetadataFramework.Basic.Inputs.Textarea;
+
+public class MyRequest
+{
+    [InputField(Label = "Notes")]
+    [StringProperty("placeholder", "Enter your notes here...")]
+    [IntProperty("max-length", 500)]
+    [BooleanProperty("auto-resize", true)]
+    [StringProperty("icon", "note-sticky")]
+    public TextareaValue? Notes { get; set; }
+}
+```
+
+## Creating Custom Property Attributes
+
+For complex custom properties, create your own attribute by inheriting from `CustomPropertyAttribute`:
+
+```csharp
+using System;
+using UiMetadataFramework.Core.Binding;
+
+public class TooltipAttribute : CustomPropertyAttribute
+{
+    public TooltipAttribute(string text) : base("tooltip")
+    {
+        this.Text = text;
+    }
+
+    public string Text { get; set; }
+
+    public override object GetValue(Type type, MetadataBinder binder)
+    {
+        return new
+        {
+            text = this.Text,
+            position = "top"
+        };
+    }
+}
+```
+
+Usage:
+
+```csharp
+public class MyRequest
+{
+    [InputField(Label = "Password")]
+    [Tooltip("Must be at least 8 characters long")]
+    public Password? Password { get; set; }
+}
+```
+
+## Custom Properties on Forms
+
+Add custom properties to entire forms by creating a custom `FormAttribute`:
+
+```csharp
+using System;
+using System.Collections.Generic;
+using UiMetadataFramework.Core.Binding;
+
+public class MyFormAttribute : FormAttribute
+{
+    public string? Theme { get; set; }
+    public string? Icon { get; set; }
+
+    public override IDictionary<string, object?>? GetCustomProperties(Type type)
+    {
+        var properties = base.GetCustomProperties(type) ?? new Dictionary<string, object?>();
+
+        if (!string.IsNullOrEmpty(this.Theme))
+        {
+            properties["theme"] = this.Theme;
+        }
+
+        if (!string.IsNullOrEmpty(this.Icon))
+        {
+            properties["icon"] = this.Icon;
+        }
+
+        return properties;
+    }
+}
+```
+
+Usage:
+
+```csharp
+using UiMetadataFramework.Basic.Server;
+
+[MyForm(
+    Id = "create-user",
+    Label = "Create User",
+    Theme = "dark",
+    Icon = "user-plus"
+)]
+public class CreateUserForm : Form<CreateUserRequest, CreateUserResponse>
+{
+    protected override CreateUserResponse Handle(CreateUserRequest request)
+    {
+        // Implementation
+    }
+}
+```
+
+## Array Properties
+
+Some custom properties contain arrays of values. Mark them with `[CustomPropertyConfig(IsArray = true)]`:
+
+```csharp
+using System;
+using System.Collections.Generic;
+using UiMetadataFramework.Core.Binding;
+
+[CustomPropertyConfig(IsArray = true)]
+public class DocumentationAttribute : CustomPropertyAttribute
+{
+    public DocumentationAttribute(string text) : base("documentation")
+    {
+        this.Text = text;
+    }
+
+    public string Text { get; set; }
+
+    public override object GetValue(Type type, MetadataBinder binder)
+    {
+        return this.Text;
+    }
+}
+```
+
+Usage - multiple instances are collected into an array:
+
+```csharp
+public class MyRequest
+{
+    [InputField(Label = "Email")]
+    [Documentation("Must be a valid email address")]
+    [Documentation("We will send a confirmation email")]
+    public string? Email { get; set; }
+}
+```
+
+The metadata will contain:
+
+```json
+{
+  "documentation": [
+    "Must be a valid email address",
+    "We will send a confirmation email"
+  ]
+}
+```
+
+## Practical Examples
+
+### Example 1: Styling Properties
+
+```csharp
+using UiMetadataFramework.Core.Binding;
+
+public class StyledFormRequest
+{
+    [InputField(Label = "Important field", OrderIndex = 1)]
+    [StringProperty("css-class", "highlight")]
+    [StringProperty("icon", "star")]
+    public string? ImportantField { get; set; }
+
+    [InputField(Label = "Regular field", OrderIndex = 2)]
+    public string? RegularField { get; set; }
+}
+```
+
+### Example 2: Validation Hints
+
+```csharp
+using UiMetadataFramework.Core.Binding;
+
+public class ValidationFormRequest
+{
+    [InputField(Label = "Email", Required = true)]
+    [StringProperty("pattern", @"^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$")]
+    [StringProperty("error-message", "Please enter a valid email address")]
+    public string? Email { get; set; }
+
+    [InputField(Label = "Age")]
+    [IntProperty("min", 18)]
+    [IntProperty("max", 120)]
+    [StringProperty("error-message", "Age must be between 18 and 120")]
+    public int? Age { get; set; }
+}
+```
+
+### Example 3: Complex Custom Property
+
+```csharp
+using System;
+using UiMetadataFramework.Core.Binding;
+
+public class FieldHelpAttribute : CustomPropertyAttribute
+{
+    public FieldHelpAttribute(string title, string content) : base("help")
+    {
+        this.Title = title;
+        this.Content = content;
+    }
+
+    public string Title { get; set; }
+    public string Content { get; set; }
+    public string? Link { get; set; }
+
+    public override object GetValue(Type type, MetadataBinder binder)
+    {
+        return new
+        {
+            title = this.Title,
+            content = this.Content,
+            link = this.Link
+        };
+    }
+}
+
+public class MyRequest
+{
+    [InputField(Label = "API Key")]
+    [FieldHelp(
+        "API Key",
+        "You can find your API key in your account settings",
+        Link = "https://example.com/docs/api-keys"
+    )]
+    public string? ApiKey { get; set; }
+}
+```
+
+### Example 4: Conditional Display
+
+```csharp
+using System;
+using UiMetadataFramework.Core.Binding;
+
+public class ConditionalDisplayAttribute : CustomPropertyAttribute
+{
+    public ConditionalDisplayAttribute(string dependsOn, object expectedValue) : base("conditional-display")
+    {
+        this.DependsOn = dependsOn;
+        this.ExpectedValue = expectedValue;
+    }
+
+    public string DependsOn { get; set; }
+    public object ExpectedValue { get; set; }
+
+    public override object GetValue(Type type, MetadataBinder binder)
+    {
+        return new
+        {
+            dependsOn = this.DependsOn,
+            expectedValue = this.ExpectedValue
+        };
+    }
+}
+
+public class ConditionalFormRequest
+{
+    [InputField(Label = "Has discount?")]
+    public bool HasDiscount { get; set; }
+
+    [InputField(Label = "Discount percentage")]
+    [ConditionalDisplay(nameof(HasDiscount), true)]
+    public int? DiscountPercentage { get; set; }
+}
+```
+
+## Accessing Custom Properties on the Client
+
+Custom properties are included in the field metadata sent to the client:
+
+```json
+{
+  "id": "Email",
+  "label": "Email",
+  "type": "text",
+  "required": true,
+  "customProperties": {
+    "placeholder": "Enter your email",
+    "icon": "envelope",
+    "auto-focus": true
+  }
+}
+```
+
+Your client-side code can read and use these properties:
+
+```javascript
+const field = formMetadata.inputFields.find(f => f.id === 'Email');
+const placeholder = field.customProperties['placeholder'];
+const icon = field.customProperties['icon'];
+const autoFocus = field.customProperties['auto-focus'];
+```
+
+## Complete Example
+
+Here's a complete example showing various custom properties:
+
+```csharp
+using System;
+using System.Collections.Generic;
+using MediatR;
+using UiMetadataFramework.Basic.Inputs.Textarea;
+using UiMetadataFramework.Basic.Server;
+using UiMetadataFramework.Core.Binding;
+
+// Custom form attribute with theme support
+public class ThemedFormAttribute : FormAttribute
+{
+    public string? ColorScheme { get; set; }
+    public string? Layout { get; set; }
+
+    public override IDictionary<string, object?>? GetCustomProperties(Type type)
+    {
+        var properties = base.GetCustomProperties(type) ?? new Dictionary<string, object?>();
+
+        if (!string.IsNullOrEmpty(this.ColorScheme))
+        {
+            properties["colorScheme"] = this.ColorScheme;
+        }
+
+        if (!string.IsNullOrEmpty(this.Layout))
+        {
+            properties["layout"] = this.Layout;
+        }
+
+        return properties;
+    }
+}
+
+// Request with various custom properties
+public class ContactFormRequest : IRequest<ContactFormResponse>
+{
+    [InputField(Label = "Full name", OrderIndex = 1, Required = true)]
+    [StringProperty("placeholder", "John Doe")]
+    [StringProperty("icon", "user")]
+    [BooleanProperty("auto-focus", true)]
+    public string? FullName { get; set; }
+
+    [InputField(Label = "Email", OrderIndex = 2, Required = true)]
+    [StringProperty("placeholder", "john@example.com")]
+    [StringProperty("icon", "envelope")]
+    [StringProperty("pattern", @"^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$")]
+    public string? Email { get; set; }
+
+    [InputField(Label = "Phone", OrderIndex = 3)]
+    [StringProperty("placeholder", "+1 (555) 123-4567")]
+    [StringProperty("icon", "phone")]
+    [StringProperty("mask", "+1 (###) ###-####")]
+    public string? Phone { get; set; }
+
+    [InputField(Label = "Message", OrderIndex = 4, Required = true)]
+    [StringProperty("placeholder", "How can we help you?")
+    [IntProperty("min-length", 10)]
+    [IntProperty("max-length", 500)]
+    public TextareaValue? Message { get; set; }
+
+    [InputField(Label = "Subscribe to newsletter", OrderIndex = 5)]
+    [BooleanProperty("default-checked", true)]
+    public bool Subscribe { get; set; }
+}
+
+public class ContactFormResponse : FormResponse
+{
+    [OutputField(Label = "Message")]
+    public string Message { get; set; }
+}
+
+[ThemedForm(
+    Id = "contact-form",
+    Label = "Contact Us",
+    ColorScheme = "blue",
+    Layout = "centered"
+)]
+public class ContactForm : Form<ContactFormRequest, ContactFormResponse>
+{
+    protected override ContactFormResponse Handle(ContactFormRequest request)
+    {
+        // Process contact form
+        SendEmail(request);
+
+        return new ContactFormResponse
+        {
+            Message = "Thank you for contacting us! We'll get back to you soon."
+        };
+    }
+
+    private void SendEmail(ContactFormRequest request)
+    {
+        // Email sending logic
+    }
+}
+```
+
+## Best Practices
+
+1. **Use Descriptive Names** - Choose clear, descriptive names for custom properties
+2. **Document Properties** - Document what each custom property does and how it should be used
+3. **Keep It Simple** - Don't overuse custom properties; use them when standard properties aren't sufficient
+4. **Validate Client-Side** - Ensure your client-side code handles missing or invalid custom properties gracefully
+5. **Version Your Properties** - If you change custom property structure, consider versioning to maintain backward compatibility
+6. **Type Safety** - Use strongly-typed custom attributes rather than string-based properties when possible
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Creating Forms" icon="file-code" href="/guides/creating-forms">
+    Review form creation basics
+  </Card>
+  <Card title="Input Components" icon="keyboard" href="/guides/input-components">
+    Learn about input field types
+  </Card>
+</CardGroup>

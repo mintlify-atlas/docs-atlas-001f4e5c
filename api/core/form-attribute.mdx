@@ -1,0 +1,145 @@
+---
+title: FormAttribute
+description: Attribute for decorating forms to control metadata generation and behavior
+---
+
+## Overview
+
+`FormAttribute` is used to decorate form classes, describing how to generate metadata for them. It controls various aspects of form behavior including labeling, auto-posting, and modal interaction.
+
+## Namespace
+
+```csharp
+UiMetadataFramework.Core.Binding
+```
+
+## Inheritance
+
+```csharp
+System.Attribute
+```
+
+## Properties
+
+<ParamField path="Id" type="string">
+  Unique identifier for the form. If not specified, the form's fully qualified type name will be used.
+</ParamField>
+
+<ParamField path="Label" type="string">
+  Display label for the form. This is typically shown as the form's title in the UI.
+</ParamField>
+
+<ParamField path="PostOnLoad" type="bool" default="false">
+  Indicates whether the form should be automatically submitted as soon as it has been loaded by the client. Useful for displaying reports or showing data without requiring user interaction.
+</ParamField>
+
+<ParamField path="PostOnLoadValidation" type="bool" default="true">
+  Indicates whether the initial auto-post (when `PostOnLoad` is true) should validate all input fields before submitting. Set to `false` to skip validation on the initial load.
+</ParamField>
+
+<ParamField path="CloseOnPostIfModal" type="bool" default="true">
+  Controls how the form behaves when opened as a modal and the user submits it:
+  - `true`: The modal automatically closes after receiving the response
+  - `false`: The modal remains open after submission
+</ParamField>
+
+## Methods
+
+### GetCustomProperties
+
+```csharp
+public virtual IDictionary<string, object?>? GetCustomProperties(Type type)
+```
+
+Retrieves custom properties for the form. Override this method in derived classes to add custom metadata.
+
+<ParamField path="type" type="Type">
+  The type to which this attribute is applied.
+</ParamField>
+
+**Returns:** Dictionary of custom properties or `null` if there are none.
+
+## Usage Examples
+
+### Basic Form
+
+```csharp
+[Form(Id = "user-registration", Label = "User Registration")]
+public class UserRegistrationForm
+{
+    [InputField(Required = true)]
+    public string Email { get; set; }
+    
+    [InputField(Required = true)]
+    public string Password { get; set; }
+}
+```
+
+### Auto-Loading Report
+
+```csharp
+[Form(
+    Id = "sales-report",
+    Label = "Sales Report",
+    PostOnLoad = true,
+    PostOnLoadValidation = false
+)]
+public class SalesReportForm
+{
+    [InputField]
+    public DateTime? StartDate { get; set; }
+    
+    [InputField]
+    public DateTime? EndDate { get; set; }
+}
+```
+
+### Modal Form That Stays Open
+
+```csharp
+[Form(
+    Id = "item-editor",
+    Label = "Edit Item",
+    CloseOnPostIfModal = false
+)]
+public class ItemEditorForm
+{
+    [InputField(Required = true)]
+    public string Name { get; set; }
+    
+    [InputField]
+    public string Description { get; set; }
+}
+```
+
+### Custom Form Attribute
+
+```csharp
+public class MenuFormAttribute : FormAttribute
+{
+    public string? MenuGroup { get; set; }
+    
+    public override IDictionary<string, object?>? GetCustomProperties(Type type)
+    {
+        var properties = base.GetCustomProperties(type) ?? new Dictionary<string, object?>();
+        properties["menuGroup"] = MenuGroup;
+        return properties;
+    }
+}
+
+[MenuForm(
+    Id = "settings",
+    Label = "Settings",
+    MenuGroup = "Administration"
+)]
+public class SettingsForm
+{
+    // Form fields...
+}
+```
+
+## See Also
+
+- [InputFieldAttribute](/api/core/input-field-attribute)
+- [OutputFieldAttribute](/api/core/output-field-attribute)
+- [MetadataBinder](/api/core/metadata-binder)

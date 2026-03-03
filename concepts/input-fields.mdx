@@ -1,0 +1,386 @@
+---
+title: "Input Fields"
+description: "Understanding input fields and the InputFieldAttribute"
+---
+
+## What are Input Fields?
+
+Input fields represent data that users provide to a form. They are properties on the request class decorated with `InputFieldAttribute`. The framework uses reflection to discover these properties and generates metadata that tells the client how to render them.
+
+## InputFieldAttribute
+
+The `InputFieldAttribute` decorates properties to mark them as input fields:
+
+```csharp /home/daytona/workspace/source/UiMetadataFramework.Core/Binding/Field/InputFieldAttribute.cs
+public class InputFieldAttribute : FieldAttribute
+{
+    public InputFieldAttribute() : base(MetadataBinder.ComponentCategories.Input)
+    {
+    }
+
+    public bool Required { get; set; }
+}
+```
+
+### Inherited Properties from FieldAttribute
+
+Since `InputFieldAttribute` inherits from `FieldAttribute`, it includes:
+
+```csharp /home/daytona/workspace/source/UiMetadataFramework.Core/Binding/Field/FieldAttribute.cs:23-37
+public abstract class FieldAttribute : Attribute
+{
+    public bool Hidden { get; set; }
+    public string? Label { get; set; }
+    public int OrderIndex { get; set; }
+}
+```
+
+## Field Properties
+
+### Required
+
+Marks a field as mandatory. The client should validate that the user provides a value before submitting:
+
+```csharp
+public class Request : IRequest<Response>
+{
+    [InputField(Label = "Email", Required = true)]
+    public string Email { get; set; }
+
+    [InputField(Label = "Phone", Required = false)]
+    public string? Phone { get; set; }
+}
+```
+
+<Note>
+The `Required` property is a client-side validation hint. You should still validate data on the server for security.
+</Note>
+
+### Label
+
+Human-readable label displayed next to the field:
+
+```csharp
+[InputField(Label = "Date of Birth")]
+public DateTime DateOfBirth { get; set; }
+
+[InputField(Label = "Full Name")]
+public string FullName { get; set; }
+```
+
+If not specified, the property name is used.
+
+### OrderIndex
+
+Controls the rendering order of fields. Lower values appear first:
+
+```csharp
+public class Request : IRequest<Response>
+{
+    [InputField(Label = "First name", OrderIndex = 1)]
+    public string FirstName { get; set; }
+
+    [InputField(Label = "Last name", OrderIndex = 2)]
+    public string LastName { get; set; }
+
+    [InputField(Label = "Email", OrderIndex = 3)]
+    public string Email { get; set; }
+}
+```
+
+<Tip>
+Use gaps in `OrderIndex` values (1, 10, 20, 30) to make it easier to insert new fields later without renumbering.
+</Tip>
+
+### Hidden
+
+Hides the field from the UI. Useful for internal values:
+
+```csharp
+public class Request : IRequest<Response>
+{
+    [InputField(Label = "Username")]
+    public string Username { get; set; }
+
+    [InputField(Hidden = true)]
+    public int TenantId { get; set; }  // Not visible to user
+}
+```
+
+Hidden fields are still included in the metadata but marked as not visible.
+
+## Type-to-Component Mapping
+
+The framework automatically maps C# types to UI components using `ComponentBinding`:
+
+### Built-in Mappings
+
+```csharp
+// String → Text input
+[InputField(Label = "Name")]
+public string Name { get; set; }
+
+// Boolean → Checkbox
+[InputField(Label = "Accept Terms")]
+public bool AcceptTerms { get; set; }
+
+// DateTime → Date picker
+[InputField(Label = "Birth Date")]
+public DateTime BirthDate { get; set; }
+
+// Decimal/Double → Number input
+[InputField(Label = "Price")]
+public decimal Price { get; set; }
+
+// Int → Number input
+[InputField(Label = "Quantity")]
+public int Quantity { get; set; }
+```
+
+### String Input Example
+
+From the source code:
+
+```csharp /home/daytona/workspace/source/UiMetadataFramework.Basic/Inputs/Text/StringInputComponentBinding.cs
+public class StringInputComponentBinding : ComponentBinding
+{
+    internal const string ControlName = "text";
+
+    public StringInputComponentBinding() : base(
+        MetadataBinder.ComponentCategories.Input,
+        serverType: typeof(string),
+        componentType: "text",
+        metadataFactory: null)
+    {
+    }
+}
+```
+
+This tells the framework:
+- Map `string` types to the `"text"` component
+- The component is in the `Input` category
+- No custom metadata factory is needed
+
+## Real-World Example
+
+From the test suite:
+
+```csharp /home/daytona/workspace/source/UiMetadataFramework.Tests/MediatrTests.cs:69-84
+public class Request : IRequest<Response>
+{
+    [InputField(Label = "First name", OrderIndex = 1, Required = true)]
+    public string FirstName { get; set; } = null!;
+
+    [InputField(Label = "DoB", OrderIndex = 2, Required = true)]
+    public DateTime DateOfBirth { get; set; }
+
+    [InputField(Hidden = true)]
+    public int Height { get; set; }
+
+    [InputField(Hidden = true)]
+    public decimal Weight { get; set; }
+
+    // Properties without InputField are not exposed in metadata
+    public bool IsRegistered { get; set; }
+}
+```
+
+This generates metadata with:
+- 2 visible input fields (FirstName, DateOfBirth)
+- 2 hidden input fields (Height, Weight)
+- 1 property ignored (IsRegistered)
+
+<Info>
+Only properties decorated with `[InputField]` are included in the form metadata. Plain properties are ignored.
+</Info>
+
+## Nullable Types
+
+Nullable types work seamlessly:
+
+```csharp
+public class Request : IRequest<Response>
+{
+    // Required, non-nullable
+    [InputField(Required = true)]
+    public string Email { get; set; } = null!;
+
+    // Optional, nullable
+    [InputField(Required = false)]
+    public string? MiddleName { get; set; }
+
+    // Optional, nullable value type
+    [InputField(Required = false)]
+    public DateTime? BirthDate { get; set; }
+}
+```
+
+## Custom Input Components
+
+You can create custom bindings for complex types:
+
+```csharp
+public class ColorPickerBinding : ComponentBinding
+{
+    public ColorPickerBinding() : base(
+        MetadataBinder.ComponentCategories.Input,
+        serverType: typeof(Color),
+        componentType: "color-picker",
+        metadataFactory: null)
+    {
+    }
+}
+
+// Register the binding
+binder.Inputs.Bindings.AddBinding(new ColorPickerBinding());
+
+// Use in your form
+public class Request : IRequest<Response>
+{
+    [InputField(Label = "Theme Color")]
+    public Color ThemeColor { get; set; }
+}
+```
+
+The framework will now map `Color` properties to the `"color-picker"` component.
+
+## Field Metadata
+
+The framework generates `FieldMetadata` for each input field:
+
+```csharp /home/daytona/workspace/source/UiMetadataFramework.Core/FieldMetadata.cs:14-93
+public class FieldMetadata
+{
+    public string? Id { get; set; }
+    public string? Label { get; set; }
+    public int OrderIndex { get; set; }
+    public bool Hidden { get; set; }
+    public Component Component { get; set; }
+    public object? Configuration { get; set; }
+    public IDictionary<string, object?>? CustomProperties { get; set; }
+    public IList<EventHandlerMetadata>? EventHandlers { get; set; }
+}
+```
+
+This metadata is serialized to JSON and sent to the client:
+
+```json
+{
+  "id": "FirstName",
+  "label": "First name",
+  "orderIndex": 1,
+  "hidden": false,
+  "component": {
+    "type": "text",
+    "serverType": "System.String"
+  },
+  "customProperties": {
+    "required": true
+  }
+}
+```
+
+## Component Configuration
+
+Some components need additional configuration. You can provide this using custom property attributes:
+
+```csharp
+public class MaxLengthAttribute : Attribute, ICustomPropertyAttribute
+{
+    public MaxLengthAttribute(int value)
+    {
+        this.Value = value;
+    }
+
+    public int Value { get; }
+
+    public object? GetCustomProperty(Type type, PropertyInfo property)
+    {
+        return new { MaxLength = this.Value };
+    }
+}
+
+public class Request : IRequest<Response>
+{
+    [InputField(Label = "Username", Required = true)]
+    [MaxLength(20)]
+    public string Username { get; set; }
+}
+```
+
+The `MaxLength` attribute adds custom properties to the field metadata that the client can use.
+
+## Validation Patterns
+
+### Client-Side Validation
+
+The `Required` property enables client-side validation:
+
+```csharp
+[InputField(Label = "Email", Required = true)]
+public string Email { get; set; }
+```
+
+The client should prevent form submission if required fields are empty.
+
+### Server-Side Validation
+
+Always validate on the server for security:
+
+```csharp
+public class RegisterUser : Form<Request, Response>
+{
+    protected override Response Handle(Request request)
+    {
+        if (string.IsNullOrWhiteSpace(request.Email))
+        {
+            throw new BusinessException("Email is required");
+        }
+
+        if (!IsValidEmail(request.Email))
+        {
+            throw new BusinessException("Invalid email format");
+        }
+
+        // Process registration...
+    }
+}
+```
+
+<Note>
+Never trust client-side validation alone. Always validate and sanitize data on the server.
+</Note>
+
+## Best Practices
+
+<CardGroup cols={2}>
+  <Card title="Use Required" icon="asterisk">
+    Mark mandatory fields with `Required = true` for better UX
+  </Card>
+  <Card title="Meaningful Labels" icon="tag">
+    Provide clear, user-friendly labels instead of using property names
+  </Card>
+  <Card title="Logical Ordering" icon="list-ol">
+    Use `OrderIndex` to create a natural flow through the form
+  </Card>
+  <Card title="Hide Internals" icon="eye-slash">
+    Use `Hidden = true` for fields that users shouldn't see
+  </Card>
+</CardGroup>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Output Fields" icon="display" href="/concepts/output-fields">
+    Learn about output fields and response handling
+  </Card>
+  <Card title="Forms" icon="file-lines" href="/concepts/forms">
+    Understand the complete form structure
+  </Card>
+  <Card title="Metadata Binding" icon="link" href="/concepts/metadata-binding">
+    See how input fields are converted to metadata
+  </Card>
+  <Card title="Custom Components" icon="puzzle-piece" href="/advanced/custom-components">
+    Create custom input components
+  </Card>
+</CardGroup>

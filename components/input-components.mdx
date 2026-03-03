@@ -1,0 +1,546 @@
+---
+title: Input Components
+description: Complete reference of all input components in UI Metadata Framework
+---
+
+Input components allow users to provide data to forms. The framework provides a comprehensive set of input types that cover common scenarios.
+
+## Component Overview
+
+All input components are defined in the `UiMetadataFramework.Basic.Inputs` namespace. Each component has a corresponding C# type that you use in your form request classes.
+
+<Accordion title="Boolean">
+
+### Purpose
+Captures true/false values from the user.
+
+### C# Type
+```csharp
+bool
+```
+
+### Component Type
+`boolean`
+
+### Usage Example
+```csharp
+public class MyFormRequest
+{
+    [InputField(Label = "Accept terms")]
+    public bool AcceptTerms { get; set; }
+}
+```
+
+### Implementation
+Defined in `BooleanInputComponentBinding.cs`:
+- Server type: `typeof(bool)`
+- Component type: `"boolean"`
+- Category: Input
+
+</Accordion>
+
+<Accordion title="Number">
+
+### Purpose
+Captures numeric values from the user.
+
+### C# Types
+Supports multiple numeric types:
+- `int`
+- `decimal`
+- `double`
+- `short`
+- `long`
+- `byte`
+
+### Component Type
+`number`
+
+### Usage Example
+```csharp
+public class MyFormRequest
+{
+    [InputField(Label = "Age")]
+    public int Age { get; set; }
+    
+    [InputField(Label = "Price")]
+    public decimal Price { get; set; }
+}
+```
+
+### Implementation
+Defined in `NumberInputComponentBinding.cs`:
+- Server types: `int`, `decimal`, `double`, `short`, `long`, `byte`
+- Component type: `"number"`
+- Category: Input
+
+</Accordion>
+
+<Accordion title="Text">
+
+### Purpose
+Captures single-line text input from the user.
+
+### C# Type
+```csharp
+string
+```
+
+### Component Type
+`text`
+
+### Usage Example
+```csharp
+public class MyFormRequest
+{
+    [InputField(Label = "First name")]
+    public string FirstName { get; set; }
+    
+    [InputField(Label = "Email")]
+    public string Email { get; set; }
+}
+```
+
+### Implementation
+Defined in `StringInputComponentBinding.cs`:
+- Server type: `typeof(string)`
+- Component type: `"text"`
+- Category: Input
+
+</Accordion>
+
+<Accordion title="Textarea">
+
+### Purpose
+Captures multi-line text input from the user.
+
+### C# Type
+```csharp
+TextareaValue
+```
+
+### Component Type
+`textarea`
+
+### Usage Example
+```csharp
+using UiMetadataFramework.Basic.Inputs.Textarea;
+
+public class MyFormRequest
+{
+    [InputField(Label = "Description")]
+    public TextareaValue Description { get; set; }
+}
+```
+
+### Properties
+- `Value` (string?): The text content
+
+### Implementation
+Defined in `TextareaValue.cs`:
+```csharp
+[MyInputComponent("textarea")]
+public class TextareaValue
+{
+    public string? Value { get; set; }
+}
+```
+
+</Accordion>
+
+<Accordion title="Password">
+
+### Purpose
+Captures sensitive password input from the user. The input is typically masked on the client.
+
+### C# Type
+```csharp
+Password
+```
+
+### Component Type
+`password`
+
+### Usage Example
+```csharp
+using UiMetadataFramework.Basic.Inputs.Password;
+
+public class LoginRequest
+{
+    [InputField(Label = "Username")]
+    public string Username { get; set; }
+    
+    [InputField(Label = "Password")]
+    public Password Password { get; set; }
+}
+```
+
+### Properties
+- `Value` (string?): The password value
+
+### Implementation
+Defined in `Password.cs`:
+```csharp
+[MyInputComponent("password")]
+public class Password
+{
+    public string? Value { get; set; }
+}
+```
+
+</Accordion>
+
+<Accordion title="DateTime">
+
+### Purpose
+Captures date and time values from the user.
+
+### C# Type
+```csharp
+DateTime
+```
+
+### Component Type
+`datetime`
+
+### Usage Example
+```csharp
+using System;
+
+public class MyFormRequest
+{
+    [InputField(Label = "Birth date")]
+    public DateTime BirthDate { get; set; }
+    
+    [InputField(Label = "Appointment time")]
+    public DateTime? AppointmentTime { get; set; }
+}
+```
+
+### Implementation
+Defined in `DateTimeInputComponentBinding.cs`:
+- Server type: `typeof(DateTime)`
+- Component type: `"datetime"`
+- Category: Input
+
+</Accordion>
+
+<Accordion title="Dropdown">
+
+### Purpose
+Allows users to select a single value from a predefined list of options.
+
+### C# Type
+```csharp
+DropdownValue<T>
+```
+
+### Component Type
+`dropdown`
+
+### Basic Usage
+```csharp
+using UiMetadataFramework.Basic.Inputs.Dropdown;
+
+public class MyFormRequest
+{
+    [InputField(Label = "Status")]
+    [Dropdown(typeof(StatusSource))]
+    public DropdownValue<string> Status { get; set; }
+}
+```
+
+### Properties
+- `Value` (T?): The selected value
+
+### DropdownAttribute
+
+Configures the dropdown data source.
+
+```csharp
+public class DropdownAttribute
+{
+    public Type Source { get; set; }
+}
+```
+
+**Parameters:**
+- `source`: Type that implements `IDropdownInlineSource` or `ITypeaheadRemoteSource`
+
+### DropdownItem
+
+Represents a single item in the dropdown.
+
+```csharp
+public class DropdownItem
+{
+    public string? Label { get; set; }  // Display text
+    public string? Value { get; set; }  // Unique identifier
+}
+```
+
+### IDropdownInlineSource
+
+Interface for static dropdown data sources.
+
+```csharp
+public interface IDropdownInlineSource
+{
+    IEnumerable<DropdownItem> GetItems();
+}
+```
+
+**Usage Example:**
+```csharp
+public class StatusSource : IDropdownInlineSource
+{
+    public IEnumerable<DropdownItem> GetItems()
+    {
+        return new[]
+        {
+            new DropdownItem("Active", "active"),
+            new DropdownItem("Inactive", "inactive"),
+            new DropdownItem("Pending", "pending")
+        };
+    }
+}
+```
+
+### EnumSource\<T\>
+
+Built-in source for enum-based dropdowns.
+
+```csharp
+public class EnumSource<T> : IDropdownInlineSource
+{
+    public IEnumerable<DropdownItem> GetItems();
+}
+```
+
+**Usage Example:**
+```csharp
+public enum Priority
+{
+    Low,
+    Medium,
+    High
+}
+
+public class MyFormRequest
+{
+    [InputField(Label = "Priority")]
+    [Dropdown(typeof(EnumSource<Priority>))]
+    public DropdownValue<string> Priority { get; set; }
+}
+```
+
+The enum values are automatically humanized (e.g., `HighPriority` becomes "High priority").
+
+### Implementation
+Defined in `DropdownValue.cs`:
+```csharp
+[MyInputComponent("dropdown", typeof(DropdownMetadataFactory))]
+[HasConfiguration(typeof(DropdownAttribute), mandatory: true)]
+public class DropdownValue<T>
+{
+    public T? Value { get; set; }
+}
+```
+
+</Accordion>
+
+<Accordion title="Typeahead">
+
+### Purpose
+Provides autocomplete functionality with dynamic data loading based on user input. Ideal for large datasets or remote data sources.
+
+### C# Type
+```csharp
+TypeaheadValue<T>
+```
+
+### Component Type
+`typeahead`
+
+### Basic Usage
+```csharp
+using UiMetadataFramework.Basic.Inputs.Typeahead;
+
+public class MyFormRequest
+{
+    [InputField(Label = "City")]
+    [Typeahead(typeof(CitySource))]
+    public TypeaheadValue<int> City { get; set; }
+}
+```
+
+### Properties
+- `Value` (T?): The selected value
+
+### TypeaheadAttribute
+
+Configures the typeahead data source.
+
+```csharp
+public class TypeaheadAttribute : DropdownAttribute
+{
+    public Type Source { get; set; }
+}
+```
+
+**Parameters:**
+- `source`: Type that implements `ITypeaheadRemoteSource` or `IDropdownInlineSource`
+
+### ITypeaheadRemoteSource
+
+Marker interface for remote typeahead sources.
+
+```csharp
+public interface ITypeaheadRemoteSource
+{
+    // Implement as a form that returns TypeaheadResponse<T>
+}
+```
+
+**Usage Example:**
+```csharp
+[Form("city-search")]
+public class CitySearch : ITypeaheadRemoteSource
+{
+    public class Request
+    {
+        public string Query { get; set; }
+    }
+    
+    public class Response : FormResponse
+    {
+        public IEnumerable<TypeaheadItem<int>> Items { get; set; }
+    }
+}
+```
+
+### TypeaheadItem\<T\>
+
+Represents a single item in the typeahead results.
+
+```csharp
+public class TypeaheadItem<T>
+{
+    public string? Label { get; set; }  // Display text
+    public T? Value { get; set; }       // Unique identifier
+}
+```
+
+**Constructor:**
+```csharp
+public TypeaheadItem(string label, T value)
+```
+
+### Remote Source Arguments
+
+You can pass parameters to remote sources using `RemoteSourceArgumentAttribute`.
+
+```csharp
+public class MyFormRequest
+{
+    [InputField(Label = "Country")]
+    [Dropdown(typeof(CountrySource))]
+    public DropdownValue<int> Country { get; set; }
+    
+    [InputField(Label = "City")]
+    [Typeahead(typeof(CitySource))]
+    [RemoteSourceArgument("countryId", "Country", "value")]
+    public TypeaheadValue<int> City { get; set; }
+}
+```
+
+**RemoteSourceArgumentAttribute Parameters:**
+- `parameter`: Name of the request parameter on the remote source
+- `source`: Name of the input field to get the value from
+- `sourceType`: Type of value to extract (e.g., "value")
+
+### Implementation
+Defined in `TypeaheadValue.cs`:
+```csharp
+[MyInputComponent("typeahead", typeof(DropdownMetadataFactory))]
+[HasConfiguration(typeof(TypeaheadAttribute), mandatory: true)]
+[HasConfiguration(typeof(RemoteSourceArgumentAttribute), isArray: true, name: "Parameters")]
+public class TypeaheadValue<T>
+{
+    public T? Value { get; set; }
+}
+```
+
+</Accordion>
+
+<Accordion title="Paginator">
+
+### Purpose
+Controls pagination parameters for `PaginatedData<T>` output components. This is typically a hidden input that works behind the scenes.
+
+### C# Type
+```csharp
+Paginator
+```
+
+### Component Type
+`paginator`
+
+### Usage Example
+```csharp
+using UiMetadataFramework.Basic.Inputs.Paginator;
+using UiMetadataFramework.Basic.Output.PaginatedData;
+
+public class MyFormRequest
+{
+    [InputField(Hidden = true)]
+    public Paginator Paginator { get; set; }
+}
+
+public class MyFormResponse
+{
+    [OutputField]
+    [PaginatedData(nameof(MyFormRequest.Paginator))]
+    public PaginatedData<User> Users { get; set; }
+}
+```
+
+### Properties
+
+- `PageIndex` (int?): Page number to retrieve (0-based)
+- `PageSize` (int?): Number of records per page
+- `OrderBy` (string?): Property name to sort by
+- `Ascending` (bool?): Sort direction (true for ascending, false for descending)
+
+### Implementation
+Defined in `Paginator.cs`:
+```csharp
+[MyInputComponent("paginator", AlwaysHidden = true)]
+public class Paginator
+{
+    [InputField(Hidden = true)]
+    public bool? Ascending { get; set; }
+    
+    [InputField(Hidden = true, Required = false)]
+    public string? OrderBy { get; set; }
+    
+    [InputField(Hidden = true)]
+    public int? PageIndex { get; set; }
+    
+    [InputField(Hidden = true)]
+    public int? PageSize { get; set; }
+}
+```
+
+### Notes
+- Always hidden from the user interface
+- Automatically populated by the client when user interacts with paginated data
+- Works in conjunction with `PaginatedData<T>` output component
+
+</Accordion>
+
+## See Also
+
+- [Output Components](/components/output-components) - Learn about output components
+- [Input Attributes](/attributes/input-attributes) - Configure input behavior with attributes
+- [Forms](/core-concepts/forms) - Understanding forms in UI Metadata Framework

@@ -1,0 +1,371 @@
+---
+title: Dependency Injection
+description: Understanding how UIMF uses dependency injection for extensibility and testability
+---
+
+UI Metadata Framework uses dependency injection to create instances of components, factories, and other services. This makes the framework extensible and testable.
+
+## DependencyInjectionContainer
+
+The `DependencyInjectionContainer` class (source:UiMetadataFramework.Core/Binding/DependencyInjectionContainer.cs:8) is a simple wrapper around `IServiceProvider`:
+
+```csharp
+public class DependencyInjectionContainer : IServiceProvider
+{
+    public DependencyInjectionContainer()
+    {
+    }
+    
+    public DependencyInjectionContainer(Func<Type, object> getInstanceFunc)
+    {
+        this.GetInstanceFunc = getInstanceFunc;
+    }
+    
+    // Default container using Activator.CreateInstance
+    public static DependencyInjectionContainer Default { get; set; } = 
+        new DependencyInjectionContainer(Activator.CreateInstance);
+    
+    public Func<Type, object> GetInstanceFunc { get; set; }
+    
+    public object GetService(Type serviceType)
+    {
+        return this.GetInstance(serviceType);
+    }
+    
+    public object GetInstance(Type type)
+    {
+        return this.GetInstanceFunc(type);
+    }
+    
+    public T GetInstance<T>()
+    {
+        return (T)this.GetInstance(typeof(T));
+    }
+}
+```
+
+## Default Container Behavior
+
+By default, UIMF uses `Activator.CreateInstance` to instantiate types. This works for types with parameterless constructors:
+
+```csharp
+var binder = new MetadataBinder();
+// Uses DependencyInjectionContainer.Default
+```
+
+## Integrating with Your DI Container
+
+You can integrate UIMF with any dependency injection framework by providing a custom `IServiceProvider`.
+
+### ASP.NET Core Example
+
+```csharp
+public void ConfigureServices(IServiceCollection services)
+{
+    // Register your services
+    services.AddScoped<IMyService, MyService>();
+    services.AddScoped<IDropdownInlineSource, MyDropdownSource>();
+    
+    // Register UIMF components
+    services.AddSingleton<MetadataBinder>(sp => 
+    {
+        var binder = new MetadataBinder(sp);
+        binder.RegisterAssembly(typeof(MyInputComponentAttribute).Assembly);
+        return binder;
+    });
+}
+```
+
+Now when UIMF needs to instantiate a service, it will use your DI container:
+
+```csharp
+public class Startup
+{
+    public void Configure(IApplicationBuilder app, MetadataBinder binder)
+    {
+        // Binder will use ASP.NET Core's service provider
+    }
+}
+```
+
+### Autofac Example
+
+```csharp
+var builder = new ContainerBuilder();
+
+// Register services
+builder.RegisterType<MyService>().As<IMyService>();
+builder.RegisterType<MyDropdownSource>().As<IDropdownInlineSource>();
+
+// Register MetadataBinder
+builder.Register(c => 
+{
+    var binder = new MetadataBinder(c.Resolve<IServiceProvider>());
+    binder.RegisterAssembly(typeof(MyInputComponentAttribute).Assembly);
+    return binder;
+}).SingleInstance();
+
+var container = builder.Build();
+```
+
+### Simple Function-Based Container
+
+For simple scenarios, you can use a function-based approach:
+
+```csharp
+var services = new Dictionary<Type, object>
+{
+    { typeof(IMyService), new MyService() },
+    { typeof(MyDropdownSource), new MyDropdownSource() }
+};
+
+var container = new DependencyInjectionContainer(type => 
+{
+    if (services.TryGetValue(type, out var service))
+    {
+        return service;
+    }
+    return Activator.CreateInstance(type);
+});
+
+var binder = new MetadataBinder(container);
+```
+
+## Where DI is Used
+
+UIML uses dependency injection in several places:
+
+### 1. Metadata Factories
+
+When a component has a custom metadata factory, UIMF instantiates it using the DI container:
+
+```csharp
+[MyInputComponent("dropdown", typeof(DropdownMetadataFactory))]
+public class DropdownValue<T>
+{
+    // DropdownMetadataFactory will be created via DI
+}
+```
+
+This means your factory can have dependencies:
+
+```csharp
+public class DropdownMetadataFactory : DefaultMetadataFactory
+{
+    private readonly ILogger logger;
+    
+    public DropdownMetadataFactory(ILogger logger)
+    {
+        this.logger = logger;
+    }
+    
+    protected override void AugmentConfiguration(...)
+    {
+        logger.LogDebug("Generating dropdown metadata");
+        // ...
+    }
+}
+```
+
+### 2. Inline Data Sources
+
+Inline sources are instantiated via DI, allowing them to access your application's services:
+
+```csharp
+public class CountriesSource : IDropdownInlineSource
+{
+    private readonly ICountryRepository repository;
+    
+    public CountriesSource(ICountryRepository repository)
+    {
+        this.repository = repository;
+    }
+    
+    public IEnumerable<DropdownItem> GetItems()
+    {
+        return repository.GetAll()
+            .Select(c => new DropdownItem(c.Name, c.Code));
+    }
+}
+```
+
+Usage in metadata factory (source:UiMetadataFramework.Basic/Inputs/Dropdown/DropdownMetadataFactory.cs:62):
+
+```csharp
+protected override void AugmentConfiguration(...)
+{
+    if (inlineSource != null)
+    {
+        // CountriesSource is created via DI container
+        var source = binder.Container.GetService(sourceType);
+        var items = sourceType.GetTypeInfo()
+            .GetMethod(nameof(IDropdownInlineSource.GetItems))
+            .Invoke(source, null);
+        
+        result["Items"] = items;
+    }
+}
+```
+
+### 3. Custom Field Metadata Factories
+
+When configuring a custom field metadata factory:
+
+```csharp
+var config = new MetadataBinderConfiguration(
+    inputFieldMetadataFactory: new MyInputFieldMetadataFactory(),
+    outputFieldMetadataFactory: new DefaultFieldMetadataFactory()
+);
+
+var binder = new MetadataBinder(container, config);
+```
+
+Your factory can have dependencies:
+
+```csharp
+public class MyInputFieldMetadataFactory : DefaultFieldMetadataFactory
+{
+    private readonly IValidationService validator;
+    
+    public MyInputFieldMetadataFactory(IValidationService validator)
+    {
+        this.validator = validator;
+    }
+    
+    public override FieldMetadata GetMetadata(...)
+    {
+        // Use validator to add custom validation rules
+        return base.GetMetadata(...);
+    }
+}
+```
+
+## Controlling Instance Lifetime
+
+The DI container is called every time an instance is needed. To control lifetime:
+
+### Singleton Pattern
+
+```csharp
+var singletons = new ConcurrentDictionary<Type, object>();
+
+var container = new DependencyInjectionContainer(type => 
+{
+    return singletons.GetOrAdd(type, t => Activator.CreateInstance(t));
+});
+```
+
+### Using Your DI Container's Lifetime Management
+
+```csharp
+// ASP.NET Core
+services.AddSingleton<MyMetadataFactory>();  // Singleton
+services.AddScoped<MyDropdownSource>();      // Scoped to request
+services.AddTransient<MyService>();          // New instance each time
+```
+
+## Testing with DI
+
+Dependency injection makes testing easier by allowing you to inject mocks:
+
+```csharp
+[Test]
+public void TestDropdownMetadata()
+{
+    // Arrange
+    var mockRepository = new Mock<ICountryRepository>();
+    mockRepository.Setup(r => r.GetAll())
+        .Returns(new[] { new Country("US", "United States") });
+    
+    var services = new ServiceCollection();
+    services.AddSingleton(mockRepository.Object);
+    services.AddTransient<CountriesSource>();
+    
+    var container = services.BuildServiceProvider();
+    var binder = new MetadataBinder(container);
+    binder.RegisterAssembly(typeof(DropdownValue<>).Assembly);
+    
+    // Act
+    var metadata = binder.GetFormMetadata<MyForm>();
+    
+    // Assert
+    var dropdownField = metadata.InputFields.First();
+    Assert.That(dropdownField.CustomProperties["Items"], Has.Count.EqualTo(1));
+}
+```
+
+## Best Practices
+
+1. **Use constructor injection**: Inject dependencies through constructors for clarity and testability
+2. **Register factories**: Register your metadata factories in the DI container with appropriate lifetimes
+3. **Avoid service locator pattern**: Don't call `container.GetService()` directly in business logic; use it only in framework extension points
+4. **Keep factories stateless**: Metadata factories should be stateless to work correctly with any lifetime
+5. **Document dependencies**: Clearly document what services your components need
+6. **Test with mocks**: Use DI to inject mocks in unit tests
+
+## Common Patterns
+
+### Factory with Configuration
+
+```csharp
+public class MyMetadataFactory : DefaultMetadataFactory
+{
+    private readonly MyOptions options;
+    
+    public MyMetadataFactory(IOptions<MyOptions> options)
+    {
+        this.options = options.Value;
+    }
+}
+
+// Registration
+services.Configure<MyOptions>(Configuration.GetSection("MyOptions"));
+services.AddTransient<MyMetadataFactory>();
+```
+
+### Factory with Multiple Dependencies
+
+```csharp
+public class MyMetadataFactory : DefaultMetadataFactory
+{
+    private readonly ILogger logger;
+    private readonly ICache cache;
+    private readonly IMapper mapper;
+    
+    public MyMetadataFactory(
+        ILogger<MyMetadataFactory> logger,
+        ICache cache,
+        IMapper mapper)
+    {
+        this.logger = logger;
+        this.cache = cache;
+        this.mapper = mapper;
+    }
+}
+```
+
+### Lazy Service Resolution
+
+```csharp
+public class MyMetadataFactory : DefaultMetadataFactory
+{
+    private readonly IServiceProvider serviceProvider;
+    
+    public MyMetadataFactory(IServiceProvider serviceProvider)
+    {
+        this.serviceProvider = serviceProvider;
+    }
+    
+    protected override void AugmentConfiguration(...)
+    {
+        // Resolve service only when needed
+        var service = serviceProvider.GetService<IMyService>();
+    }
+}
+```
+
+## Next Steps
+
+- Learn how to [create custom components](/advanced/custom-components)
+- Understand [metadata factories](/advanced/metadata-factories)
+- See [client integration](/advanced/client-integration) patterns

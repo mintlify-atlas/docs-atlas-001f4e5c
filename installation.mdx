@@ -1,0 +1,259 @@
+---
+title: Installation
+description: Install UI Metadata Framework packages for .NET and TypeScript
+---
+
+UI Metadata Framework is distributed as NuGet packages for .NET backends and an npm package for TypeScript frontends.
+
+## Prerequisites
+
+### For .NET backend
+
+- .NET Standard 2.0 or higher
+- .NET Framework 4.7.2 or higher
+- A C# project (ASP.NET Core, console app, etc.)
+
+### For TypeScript frontend
+
+- Node.js 12 or higher
+- npm or yarn package manager
+- A TypeScript or JavaScript project
+
+## .NET packages
+
+UIFM provides two main NuGet packages for building your backend:
+
+### UiMetadataFramework.Core
+
+The core package provides the fundamental building blocks for creating forms and generating metadata. Use this package if you want to build your own custom component library.
+
+<CodeGroup>
+```bash .NET CLI
+dotnet add package UiMetadataFramework.Core
+```
+
+```bash Package Manager
+Install-Package UiMetadataFramework.Core
+```
+
+```xml PackageReference
+<PackageReference Include="UiMetadataFramework.Core" Version="1.0.24-alpha" />
+```
+</CodeGroup>
+
+**Key features:**
+- Form metadata generation via reflection
+- Attribute-based form definition (`FormAttribute`, `InputFieldAttribute`, `OutputFieldAttribute`)
+- Extensible component binding system
+- Event handler support
+- Type-safe metadata structure
+
+**Dependencies:**
+- Newtonsoft.Json 13.0.3
+
+### UiMetadataFramework.Basic
+
+The basic package builds on top of Core and provides a ready-to-use component library with common input and output field types.
+
+<CodeGroup>
+```bash .NET CLI
+dotnet add package UiMetadataFramework.Basic
+```
+
+```bash Package Manager
+Install-Package UiMetadataFramework.Basic
+```
+
+```xml PackageReference
+<PackageReference Include="UiMetadataFramework.Basic" Version="1.0.18-alpha" />
+```
+</CodeGroup>
+
+**Key features:**
+- Pre-built input components (text, number, date, dropdown, typeahead, etc.)
+- Pre-built output components (text, tables, paginated lists, etc.)
+- `Form<TRequest, TResponse>` base class for easy form implementation
+- `FormResponse` and `FormResponseMetadata` classes
+- Integration with MediatR for request handling
+
+**Dependencies:**
+- UiMetadataFramework.Core
+- MediatR 9.0.0
+- Humanizer.Core 2.8.26
+- Microsoft.CSharp 4.7.0
+
+<Note>
+Most applications should install both packages. `UiMetadataFramework.Core` is automatically included as a dependency of `UiMetadataFramework.Basic`.
+</Note>
+
+## TypeScript package
+
+The TypeScript package provides type definitions for working with UIMF metadata on the frontend.
+
+### uimf-core
+
+Install the `uimf-core` package to get TypeScript types for form metadata, input fields, output fields, and more.
+
+<CodeGroup>
+```bash npm
+npm install uimf-core
+```
+
+```bash yarn
+yarn add uimf-core
+```
+
+```bash pnpm
+pnpm add uimf-core
+```
+</CodeGroup>
+
+**Package details:**
+- Version: 0.0.8
+- Zero dependencies
+- Full TypeScript support
+- ES modules
+
+### Usage example
+
+```typescript
+import { FormMetadata, InputFieldMetadata, OutputFieldMetadata } from 'uimf-core';
+
+// Fetch metadata from your API
+const response = await fetch('/api/forms/MyForm/metadata');
+const metadataJson = await response.json();
+
+// Create typed FormMetadata instance
+const formMetadata = new FormMetadata(metadataJson);
+
+// Access strongly-typed properties
+console.log(formMetadata.label);        // string
+console.log(formMetadata.inputFields);  // InputFieldMetadata[]
+console.log(formMetadata.outputFields); // OutputFieldMetadata[]
+console.log(formMetadata.postOnLoad);   // boolean
+
+// Get custom properties
+const customProp = formMetadata.getCustomProperty('myProperty');
+```
+
+<Tip>
+The `uimf-core` package is framework-agnostic. You can use it with React, Vue, Angular, Svelte, or vanilla JavaScript.
+</Tip>
+
+## Frontend client implementations
+
+While `uimf-core` provides the types and metadata classes, you'll need a client implementation to actually render the forms. Here are the official implementations:
+
+### uimf-svelte
+
+A complete web client built with Svelte:
+
+```bash
+npm install uimf-svelte
+```
+
+Learn more: [https://github.com/unops/uimf-svelte](https://github.com/unops/uimf-svelte)
+
+<Note>
+You can build your own client implementation for any frontend framework by consuming the metadata from `uimf-core` and rendering the appropriate components.
+</Note>
+
+## Verify installation
+
+### .NET verification
+
+Create a simple form to verify your installation:
+
+```csharp
+using UiMetadataFramework.Basic.Server;
+using UiMetadataFramework.Core.Binding;
+using MediatR;
+
+[Form(Label = "Test Form")]
+public class TestForm : Form<TestForm.Request, TestForm.Response>
+{
+    public class Request : IRequest<Response>
+    {
+        [InputField(Label = "Name")]
+        public string Name { get; set; }
+    }
+
+    public class Response : FormResponse
+    {
+        [OutputField(Label = "Greeting")]
+        public string Greeting { get; set; }
+    }
+
+    protected override Response Handle(Request request)
+    {
+        return new Response
+        {
+            Greeting = $"Hello, {request.Name}!"
+        };
+    }
+}
+```
+
+If this code compiles without errors, your installation is successful.
+
+### TypeScript verification
+
+Import the types to verify your installation:
+
+```typescript
+import { FormMetadata } from 'uimf-core';
+
+const metadata = new FormMetadata({
+    id: 'test',
+    label: 'Test Form',
+    inputFields: [],
+    outputFields: [],
+    postOnLoad: false,
+    postOnLoadValidation: true
+});
+
+console.log(metadata.label); // Output: "Test Form"
+```
+
+If this code runs without errors, your installation is successful.
+
+## Troubleshooting
+
+### NuGet package version conflicts
+
+If you encounter version conflicts with dependencies (especially MediatR or Newtonsoft.Json), you can explicitly specify versions in your `.csproj` file:
+
+```xml
+<PackageReference Include="MediatR" Version="9.0.0" />
+<PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
+```
+
+### TypeScript module resolution
+
+If you get module resolution errors, ensure your `tsconfig.json` includes:
+
+```json
+{
+  "compilerOptions": {
+    "moduleResolution": "node",
+    "esModuleInterop": true
+  }
+}
+```
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="Quickstart" icon="rocket" href="/quickstart">
+    Build your first form in under 5 minutes
+  </Card>
+  <Card title="Core concepts" icon="book" href="/concepts/overview">
+    Learn the fundamental concepts of UIMF
+  </Card>
+  <Card title="Creating forms" icon="file-code" href="/guides/creating-forms">
+    Detailed guide on building forms
+  </Card>
+  <Card title="API reference" icon="code" href="/api/core/form-attribute">
+    Explore the complete API documentation
+  </Card>
+</CardGroup>

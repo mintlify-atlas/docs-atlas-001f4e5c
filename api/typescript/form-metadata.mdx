@@ -1,0 +1,147 @@
+---
+title: FormMetadata
+description: TypeScript class for form metadata
+---
+
+## Overview
+
+`FormMetadata` encapsulates all information needed to render a form. This class is instantiated by the client when it receives metadata from the server.
+
+## Class Signature
+
+```typescript
+export class FormMetadata {
+  constructor(metadata: any)
+}
+```
+
+## Properties
+
+<ParamField path="id" type="string">
+  Unique identifier of the form to which this metadata belongs.
+</ParamField>
+
+<ParamField path="label" type="string">
+  Human-readable label for this form, typically displayed in the UI.
+</ParamField>
+
+<ParamField path="inputFields" type="InputFieldMetadata[]">
+  Array of input field metadata objects that define the form's input controls.
+</ParamField>
+
+<ParamField path="outputFields" type="OutputFieldMetadata[]">
+  Array of output field metadata objects that define the form's output controls.
+</ParamField>
+
+<ParamField path="postOnLoad" type="boolean">
+  Indicates whether the form should be automatically posted as soon as it has been loaded by the client. This is useful for displaying reports and showing data without requiring user interaction.
+</ParamField>
+
+<ParamField path="postOnLoadValidation" type="boolean">
+  Indicates whether the initial post (when `postOnLoad` is true) should validate all input fields before posting.
+</ParamField>
+
+<ParamField path="customProperties" type="any">
+  Additional parameters for the client that can be used to pass custom configuration or data to form renderers.
+</ParamField>
+
+<ParamField path="eventHandlers" type="EventHandlerMetadata[]">
+  Array of event handlers attached to this form.
+</ParamField>
+
+## Methods
+
+### getCustomProperty
+
+Retrieves the value of a custom property by name.
+
+```typescript
+getCustomProperty(name: string): any
+```
+
+**Parameters:**
+- `name` - The name of the custom property to retrieve
+
+**Returns:** The value of the custom property, or `null` if the property is undefined.
+
+## Usage Example
+
+```typescript
+import { FormMetadata } from 'uimf-core';
+
+// Client receives metadata from server
+const metadataJson = {
+  id: 'user-profile',
+  label: 'User Profile',
+  postOnLoad: false,
+  postOnLoadValidation: true,
+  inputFields: [
+    {
+      id: 'username',
+      label: 'Username',
+      type: 'text',
+      required: true
+    }
+  ],
+  outputFields: [
+    {
+      id: 'message',
+      label: 'Status Message',
+      type: 'text'
+    }
+  ],
+  customProperties: {
+    theme: 'dark',
+    maxWidth: 600
+  }
+};
+
+// Instantiate FormMetadata
+const formMetadata = new FormMetadata(metadataJson);
+
+// Access properties
+console.log(formMetadata.id); // 'user-profile'
+console.log(formMetadata.inputFields.length); // 1
+
+// Get custom property
+const theme = formMetadata.getCustomProperty('theme'); // 'dark'
+const missing = formMetadata.getCustomProperty('nonexistent'); // null
+```
+
+## How Clients Use This Class
+
+Clients typically use `FormMetadata` in the following workflow:
+
+1. **Receive metadata** - The server sends form metadata as JSON
+2. **Instantiate** - Create a `FormMetadata` instance from the JSON
+3. **Render form** - Use the `inputFields` and `outputFields` to render the appropriate UI controls
+4. **Configure behavior** - Use `postOnLoad` and other properties to control form behavior
+5. **Access custom data** - Use `getCustomProperty()` to retrieve custom configuration
+
+```typescript
+// Example: Form renderer using FormMetadata
+class FormRenderer {
+  render(metadata: FormMetadata) {
+    const container = document.createElement('div');
+    
+    // Render input fields
+    metadata.inputFields.forEach(field => {
+      const control = this.createInputControl(field);
+      container.appendChild(control);
+    });
+    
+    // Render output fields
+    metadata.outputFields.forEach(field => {
+      const control = this.createOutputControl(field);
+      container.appendChild(control);
+    });
+    
+    // Auto-post if configured
+    if (metadata.postOnLoad) {
+      this.submitForm(metadata, metadata.postOnLoadValidation);
+    }
+    
+    return container;
+  }
+}
+```

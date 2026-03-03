@@ -1,122 +1,104 @@
 {
   "$schema": "https://mintlify.com/docs.json",
-  "theme": "mint",
-  "name": "Mint Starter Kit",
+  "name": "UI Metadata Framework",
+  "theme": "palm",
   "colors": {
-    "primary": "#16A34A",
-    "light": "#07C983",
-    "dark": "#15803D"
+    "primary": "#2563eb",
+    "light": "#60a5fa",
+    "dark": "#1e40af"
   },
-  "favicon": "/favicon.svg",
+  "navbar": {
+    "primary": {
+      "type": "github",
+      "href": "https://github.com/UNOPS/UiMetadataFramework"
+    }
+  },
+  "footer": {
+    "socials": {
+      "github": "https://github.com/UNOPS/UiMetadataFramework"
+    }
+  },
   "navigation": {
     "tabs": [
       {
-        "tab": "Guides",
+        "tab": "Documentation",
         "groups": [
           {
-            "group": "Getting started",
+            "group": "Get Started",
             "pages": [
-              "index",
+              "introduction",
               "quickstart",
-              "development"
+              "installation"
             ]
           },
           {
-            "group": "Customization",
+            "group": "Core Concepts",
             "pages": [
-              "essentials/settings",
-              "essentials/navigation"
+              "concepts/overview",
+              "concepts/forms",
+              "concepts/input-fields",
+              "concepts/output-fields",
+              "concepts/metadata-binding"
             ]
           },
           {
-            "group": "Writing content",
+            "group": "Building with UIMF",
             "pages": [
-              "essentials/markdown",
-              "essentials/code",
-              "essentials/images",
-              "essentials/reusable-snippets"
+              "guides/creating-forms",
+              "guides/input-components",
+              "guides/output-components",
+              "guides/event-handlers",
+              "guides/custom-properties"
             ]
           },
           {
-            "group": "AI tools",
+            "group": "Component Library",
             "pages": [
-              "ai-tools/cursor",
-              "ai-tools/claude-code",
-              "ai-tools/windsurf"
+              "components/input-components",
+              "components/output-components"
+            ]
+          },
+          {
+            "group": "Advanced",
+            "pages": [
+              "advanced/custom-components",
+              "advanced/metadata-factories",
+              "advanced/dependency-injection",
+              "advanced/client-integration"
             ]
           }
         ]
       },
       {
-        "tab": "API reference",
+        "tab": "API Reference",
         "groups": [
           {
-            "group": "API documentation",
+            "group": "Core API",
             "pages": [
-              "api-reference/introduction"
+              "api/core/form-attribute",
+              "api/core/input-field-attribute",
+              "api/core/output-field-attribute",
+              "api/core/component-binding",
+              "api/core/metadata-binder"
             ]
           },
           {
-            "group": "Endpoint examples",
+            "group": "Basic Components",
             "pages": [
-              "api-reference/endpoint/get",
-              "api-reference/endpoint/create",
-              "api-reference/endpoint/delete",
-              "api-reference/endpoint/webhook"
+              "api/basic/input-components",
+              "api/basic/output-components",
+              "api/basic/event-handlers"
+            ]
+          },
+          {
+            "group": "TypeScript API",
+            "pages": [
+              "api/typescript/form-metadata",
+              "api/typescript/field-metadata"
             ]
           }
         ]
       }
-    ],
-    "global": {
-      "anchors": [
-        {
-          "anchor": "Documentation",
-          "href": "https://mintlify.com/docs",
-          "icon": "book-open-cover"
-        },
-        {
-          "anchor": "Blog",
-          "href": "https://mintlify.com/blog",
-          "icon": "newspaper"
-        }
-      ]
-    }
-  },
-  "logo": {
-    "light": "/logo/light.svg",
-    "dark": "/logo/dark.svg"
-  },
-  "navbar": {
-    "links": [
-      {
-        "label": "Support",
-        "href": "mailto:hi@mintlify.com"
-      }
-    ],
-    "primary": {
-      "type": "button",
-      "label": "Dashboard",
-      "href": "https://dashboard.mintlify.com"
-    }
-  },
-  "contextual": {
-    "options": [
-     "copy",
-     "view",
-     "chatgpt",
-     "claude",
-     "perplexity",
-     "mcp",
-     "cursor",
-     "vscode"
-   ]
-  },
-  "footer": {
-    "socials": {
-      "x": "https://x.com/mintlify",
-      "github": "https://github.com/mintlify",
-      "linkedin": "https://linkedin.com/company/mintlify"
-    }
+    ]
   }
 }

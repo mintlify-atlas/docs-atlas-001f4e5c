@@ -1,0 +1,300 @@
+---
+title: ComponentBinding
+description: Maps server-side types to client-side UI components
+---
+
+## Overview
+
+`ComponentBinding` represents a mapping between server-side types and client-side UI components. It implements the `IComponentBinding` interface and is used by the metadata binder to determine which component should be used to render a specific type.
+
+## Namespace
+
+```csharp
+UiMetadataFramework.Core.Binding
+```
+
+## Interfaces
+
+- `IComponentBinding`
+
+## Properties
+
+<ParamField path="Category" type="string" readonly>
+  Component category to which this component belongs. Components within the same category must have unique names. Common categories include `"input"` and `"output"` (see `MetadataBinder.ComponentCategories`).
+</ParamField>
+
+<ParamField path="ComponentType" type="string" readonly>
+  Name of the client-side component that will be rendered. This corresponds to the component name on the client.
+</ParamField>
+
+<ParamField path="ServerTypes" type="IEnumerable<Type>" readonly>
+  Collection of server-side types that are mapped to this component. Multiple types can be bound to the same component.
+</ParamField>
+
+<ParamField path="MetadataFactory" type="Type?" readonly>
+  Type of the `IMetadataFactory` to use for constructing component metadata. If `null`, `DefaultMetadataFactory` will be used.
+</ParamField>
+
+<ParamField path="AllowedConfigurations" type="HasConfigurationAttribute[]" readonly>
+  Array of allowed configurations for this component. Configurations customize component behavior and appearance.
+</ParamField>
+
+<ParamField path="AdditionalData" type="IReadOnlyDictionary<string, object?>?" readonly>
+  Additional data associated with this component type. Can be used to pass custom metadata to the client.
+</ParamField>
+
+## Constructors
+
+### Single Server Type Constructor
+
+```csharp
+public ComponentBinding(
+    string category,
+    Type serverType,
+    string componentType,
+    Type? metadataFactory,
+    params HasConfigurationAttribute[] allowedConfigurations)
+```
+
+Creates a binding for a single server type.
+
+<ParamField path="category" type="string">
+  Component category (e.g., "input" or "output").
+</ParamField>
+
+<ParamField path="serverType" type="Type">
+  Server-side type to bind to the component.
+</ParamField>
+
+<ParamField path="componentType" type="string">
+  Name of the client-side component.
+</ParamField>
+
+<ParamField path="metadataFactory" type="Type?">
+  Metadata factory type, or `null` to use the default.
+</ParamField>
+
+<ParamField path="allowedConfigurations" type="HasConfigurationAttribute[]">
+  Allowed configurations for the component.
+</ParamField>
+
+### Multiple Server Types Constructor
+
+```csharp
+public ComponentBinding(
+    string category,
+    IEnumerable<Type> serverTypes,
+    ComponentAttribute attribute,
+    params HasConfigurationAttribute[] allowedConfigurations)
+```
+
+Creates a binding for multiple server types using a component attribute.
+
+<ParamField path="category" type="string">
+  Component category.
+</ParamField>
+
+<ParamField path="serverTypes" type="IEnumerable<Type>">
+  Collection of server-side types to bind to the component.
+</ParamField>
+
+<ParamField path="attribute" type="ComponentAttribute">
+  Component attribute containing component configuration.
+</ParamField>
+
+<ParamField path="allowedConfigurations" type="HasConfigurationAttribute[]">
+  Allowed configurations for the component.
+</ParamField>
+
+## Methods
+
+### GetAdditionalData\<T\>
+
+```csharp
+public T? GetAdditionalData<T>(string key)
+```
+
+Attempts to retrieve a value from `AdditionalData` with the specified key and of the specified type.
+
+<ParamField path="key" type="string">
+  Key of the item in `AdditionalData`.
+</ParamField>
+
+<ParamField path="T" type="Type">
+  Type that the value should have. If the value exists but is not of this type, the default value will be returned.
+</ParamField>
+
+**Returns:** Value from `AdditionalData` or default if no matching value was found.
+
+### Equals
+
+```csharp
+public override bool Equals(object? obj)
+```
+
+Determines whether two component bindings are equal based on their category, component type, and server types.
+
+### GetHashCode
+
+```csharp
+public override int GetHashCode()
+```
+
+Returns a hash code for the component binding.
+
+## Usage Examples
+
+### Creating a Simple Component Binding
+
+```csharp
+var binding = new ComponentBinding(
+    category: MetadataBinder.ComponentCategories.Input,
+    serverType: typeof(string),
+    componentType: "text",
+    metadataFactory: null
+);
+```
+
+### Creating a Binding with Multiple Server Types
+
+```csharp
+var binding = new ComponentBinding(
+    category: MetadataBinder.ComponentCategories.Input,
+    serverTypes: new[] { typeof(int), typeof(long), typeof(decimal) },
+    componentType: "number",
+    metadataFactory: typeof(NumberMetadataFactory)
+);
+```
+
+### Creating a Binding with Configurations
+
+```csharp
+public class MaxLengthConfiguration : HasConfigurationAttribute
+{
+    public int MaxLength { get; set; }
+}
+
+public class MinLengthConfiguration : HasConfigurationAttribute
+{
+    public int MinLength { get; set; }
+}
+
+var binding = new ComponentBinding(
+    category: MetadataBinder.ComponentCategories.Input,
+    serverType: typeof(string),
+    componentType: "text",
+    metadataFactory: null,
+    allowedConfigurations: new HasConfigurationAttribute[]
+    {
+        new MaxLengthConfiguration(),
+        new MinLengthConfiguration()
+    }
+);
+```
+
+### Using Component Binding with MetadataBinder
+
+```csharp
+public class CustomComponentBinding : ComponentBinding
+{
+    public CustomComponentBinding()
+        : base(
+            category: MetadataBinder.ComponentCategories.Input,
+            serverType: typeof(CustomType),
+            componentType: "custom-input",
+            metadataFactory: typeof(CustomMetadataFactory))
+    {
+    }
+}
+
+// Register the binding
+var binder = new MetadataBinder();
+binder.RegisterAssembly(typeof(CustomComponentBinding).Assembly);
+```
+
+### Accessing Additional Data
+
+```csharp
+public class RichComponentBinding : ComponentBinding
+{
+    public RichComponentBinding()
+        : base(
+            category: MetadataBinder.ComponentCategories.Output,
+            serverTypes: new[] { typeof(RichContent) },
+            attribute: new ComponentAttribute("rich-editor")
+            {
+                // Additional data can be set via the attribute
+            })
+    {
+        // Set additional data
+        AdditionalData = new Dictionary<string, object?>
+        {
+            ["syntax-highlighting"] = true,
+            ["theme"] = "dark",
+            ["plugins"] = new[] { "spellcheck", "wordcount" }
+        };
+    }
+}
+
+// Later, retrieve the data
+var syntaxHighlighting = binding.GetAdditionalData<bool>("syntax-highlighting");
+var theme = binding.GetAdditionalData<string>("theme");
+var plugins = binding.GetAdditionalData<string[]>("plugins");
+```
+
+### Custom Component Binding Class
+
+```csharp
+public class DateRangeInputBinding : ComponentBinding
+{
+    public DateRangeInputBinding()
+        : base(
+            category: MetadataBinder.ComponentCategories.Input,
+            serverType: typeof(DateRange),
+            componentType: "date-range",
+            metadataFactory: typeof(DateRangeMetadataFactory),
+            allowedConfigurations: new HasConfigurationAttribute[]
+            {
+                new MinDateConfiguration(),
+                new MaxDateConfiguration()
+            })
+    {
+    }
+}
+
+public class DateRange
+{
+    public DateTime Start { get; set; }
+    public DateTime End { get; set; }
+}
+```
+
+## IComponentBinding Interface
+
+The `IComponentBinding` interface defines the contract that all component bindings must implement:
+
+```csharp
+public interface IComponentBinding
+{
+    IReadOnlyDictionary<string, object?>? AdditionalData { get; }
+    HasConfigurationAttribute[] AllowedConfigurations { get; }
+    string ComponentType { get; }
+    Type? MetadataFactory { get; }
+    IEnumerable<Type> ServerTypes { get; }
+}
+```
+
+## Notes
+
+- Component bindings are typically created by inheriting from `ComponentBinding` and registering them with the `MetadataBinder`.
+- Multiple server types can be mapped to the same component, allowing for type consolidation on the client side.
+- The `MetadataFactory` property allows for custom metadata generation logic.
+- Additional data can be used to pass component-specific configuration to the client.
+- Component bindings are automatically discovered and registered when calling `MetadataBinder.RegisterAssembly()`.
+
+## See Also
+
+- [MetadataBinder](/api/core/metadata-binder)
+- [FormAttribute](/api/core/form-attribute)
+- [InputFieldAttribute](/api/core/input-field-attribute)
+- [OutputFieldAttribute](/api/core/output-field-attribute)

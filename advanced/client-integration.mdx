@@ -1,0 +1,471 @@
+---
+title: Client Integration
+description: Understanding the client-server protocol and how to integrate UIMF with frontend applications
+---
+
+UI Metadata Framework follows a client-server protocol where the backend generates metadata and the frontend consumes it to dynamically render forms. This guide explains how the protocol works and how to integrate it with your frontend application.
+
+## The Client-Server Protocol
+
+UIML uses a simple JSON-based protocol:
+
+1. **Metadata Request**: Client requests metadata for a form
+2. **Metadata Response**: Server responds with form metadata (structure, fields, validation rules)
+3. **Form Submission**: Client submits form data
+4. **Form Response**: Server responds with results and output metadata
+
+## TypeScript Metadata Classes
+
+The framework provides TypeScript classes to work with metadata in a type-safe manner. These are available in the `uimf-core` package.
+
+### FormMetadata
+
+Represents the complete metadata for a form (source:uimf-core/src/FormMetadata.ts:8):
+
+```typescript
+export class FormMetadata {
+    constructor(metadata: any) {
+        for (var property of Object.keys(metadata)) {
+            this[property] = metadata[property];
+        }
+        
+        this.inputFields = metadata.inputFields.map(t => new InputFieldMetadata(t));
+        this.outputFields = metadata.outputFields.map(t => new OutputFieldMetadata(t));
+    }
+    
+    // Form identifier
+    public id: string;
+    
+    // Display label
+    public label: string;
+    
+    // Input field definitions
+    public inputFields: InputFieldMetadata[];
+    
+    // Output field definitions
+    public outputFields: OutputFieldMetadata[];
+    
+    // Auto-post form on load
+    public postOnLoad: boolean;
+    
+    // Validate before auto-posting
+    public postOnLoadValidation: boolean;
+    
+    // Custom properties for client use
+    public customProperties: any;
+    
+    // Event handlers
+    public eventHandlers: EventHandlerMetadata[];
+    
+    public getCustomProperty(name: string): any {
+        if (this.customProperties != null && this.customProperties[name]) {
+            return this.customProperties[name];
+        }
+        return null;
+    }
+}
+```
+
+### InputFieldMetadata
+
+Defines metadata for a single input field (source:uimf-core/src/InputFieldMetadata.ts:6):
+
+```typescript
+export class InputFieldMetadata {
+    constructor(metadata: any) {
+        for (var property of Object.keys(metadata)) {
+            this[property] = metadata[property];
+        }
+    }
+    
+    // Field identifier
+    public id: string;
+    
+    // Display label
+    public label: string;
+    
+    // Component type (e.g., "text", "dropdown", "date")
+    public type: string;
+    
+    // Whether field is required
+    public required: boolean;
+    
+    // Whether field should be hidden
+    public hidden: boolean;
+    
+    // Rendering order
+    public orderIndex: number;
+    
+    // Component-specific configuration
+    public customProperties: any;
+    
+    // Event handlers
+    public eventHandlers: EventHandlerMetadata[];
+    
+    public getCustomProperty(name: string): any {
+        if (this.customProperties != null && this.customProperties[name]) {
+            return this.customProperties[name];
+        }
+        return null;
+    }
+}
+```
+
+### OutputFieldMetadata
+
+Defines metadata for a single output field (source:uimf-core/src/OutputFieldMetadata.ts:6):
+
+```typescript
+export class OutputFieldMetadata {
+    constructor(metadata: any) {
+        for (var property of Object.keys(metadata)) {
+            this[property] = metadata[property];
+        }
+        
+        // Special case for paginated-data columns
+        if (this.customProperties != null && this.customProperties.columns != null) {
+            for (let columnPropertyName in this.customProperties.columns) {
+                let metadataAsJsonObject = this.customProperties.columns[columnPropertyName];
+                this.customProperties.columns[columnPropertyName] = 
+                    new OutputFieldMetadata(metadataAsJsonObject);
+            }
+        }
+    }
+    
+    // Field identifier
+    public id: string;
+    
+    // Display label
+    public label: string;
+    
+    // Component type (e.g., "text", "table", "chart")
+    public type: string;
+    
+    // Whether field should be hidden
+    public hidden: boolean;
+    
+    // Rendering order
+    public orderIndex: number;
+    
+    // Component-specific configuration
+    public customProperties: any;
+    
+    // Event handlers
+    public eventHandlers: EventHandlerMetadata[];
+    
+    public getCustomProperty(name: string): any {
+        if (this.customProperties != null && this.customProperties[name]) {
+            return this.customProperties[name];
+        }
+        return null;
+    }
+}
+```
+
+### FormResponse
+
+Represents the server's response after form submission (source:uimf-core/src/FormResponse.ts:6):
+
+```typescript
+export class FormResponse extends Object {
+    // Additional metadata for rendering results
+    metadata: FormResponseMetadata;
+}
+```
+
+## Example Metadata JSON
+
+Here's what the metadata looks like when serialized (from README.md):
+
+```json
+{
+    "id": "UiMetadataFramework.Web.Forms.AddNumbers",
+    "label": "Add 2 numbers",
+    "inputFields": [
+        {
+            "id": "Number1",
+            "label": "First number",
+            "type": "number",
+            "required": true,
+            "hidden": false,
+            "orderIndex": 0,
+            "customProperties": null,
+            "eventHandlers": []
+        },
+        {
+            "id": "Number2",
+            "label": "Second number",
+            "type": "number",
+            "required": true,
+            "hidden": false,
+            "orderIndex": 0,
+            "customProperties": null,
+            "eventHandlers": []
+        }
+    ],
+    "outputFields": [
+        {
+            "id": "Result",
+            "label": "Result of your calculation",
+            "type": "number",
+            "hidden": false,
+            "orderIndex": 0,
+            "customProperties": null,
+            "eventHandlers": []
+        }
+    ],
+    "postOnLoad": false,
+    "postOnLoadValidation": true,
+    "customProperties": null,
+    "eventHandlers": []
+}
+```
+
+## Implementing a Client
+
+To create a UIMF client, you need to:
+
+1. **Fetch metadata** from the server
+2. **Render input fields** based on field type
+3. **Handle form submission**
+4. **Render output fields** based on field type
+
+### Step 1: Fetching Metadata
+
+```typescript
+import { FormMetadata } from 'uimf-core';
+
+async function getFormMetadata(formId: string): Promise<FormMetadata> {
+    const response = await fetch(`/api/forms/${formId}/metadata`);
+    const json = await response.json();
+    return new FormMetadata(json);
+}
+```
+
+### Step 2: Rendering Input Fields
+
+Create a component registry that maps component types to React/Vue/Svelte components:
+
+```typescript
+// Component registry
+const inputComponents = {
+    'text': TextInput,
+    'number': NumberInput,
+    'dropdown': DropdownInput,
+    'date': DateInput,
+    'datetime': DateTimeInput,
+    'boolean': CheckboxInput,
+    // ... more components
+};
+
+// Render function
+function renderInputField(field: InputFieldMetadata) {
+    const Component = inputComponents[field.type];
+    
+    if (!Component) {
+        throw new Error(`Unknown input component type: ${field.type}`);
+    }
+    
+    return (
+        <Component
+            id={field.id}
+            label={field.label}
+            required={field.required}
+            hidden={field.hidden}
+            config={field.customProperties}
+            eventHandlers={field.eventHandlers}
+        />
+    );
+}
+```
+
+### Step 3: Handling Form Submission
+
+```typescript
+async function submitForm(formId: string, data: any): Promise<any> {
+    const response = await fetch(`/api/forms/${formId}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data)
+    });
+    
+    return await response.json();
+}
+```
+
+### Step 4: Rendering Output Fields
+
+```typescript
+const outputComponents = {
+    'text': TextOutput,
+    'number': NumberOutput,
+    'table': TableOutput,
+    'action-list': ActionListOutput,
+    'paginated-data': PaginatedDataOutput,
+    // ... more components
+};
+
+function renderOutputField(field: OutputFieldMetadata, value: any) {
+    const Component = outputComponents[field.type];
+    
+    if (!Component) {
+        throw new Error(`Unknown output component type: ${field.type}`);
+    }
+    
+    return (
+        <Component
+            id={field.id}
+            label={field.label}
+            value={value}
+            hidden={field.hidden}
+            config={field.customProperties}
+            eventHandlers={field.eventHandlers}
+        />
+    );
+}
+```
+
+## Reference Implementation: uimf-svelte
+
+The [uimf-svelte](https://github.com/unops/uimf-svelte) project is a full-featured UIMF client built with Svelte. It demonstrates:
+
+- Complete component library (inputs and outputs)
+- Event handler system
+- Form validation
+- Dynamic form rendering
+- Type-safe metadata handling
+
+### Key Features
+
+**Component Architecture**:
+```typescript
+// Each component receives metadata and emits events
+export let field: InputFieldMetadata;
+export let value: any;
+export let form: FormInstance;
+
+// Component-specific config from customProperties
+const config = field.customProperties;
+```
+
+**Event Handlers**:
+```typescript
+import { EventHandlerMetadata } from 'uimf-core';
+
+// Run event handlers at specific lifecycle points
+function runEventHandlers(runAt: string) {
+    field.eventHandlers
+        .filter(h => h.runAt === runAt)
+        .forEach(h => executeHandler(h));
+}
+```
+
+**Dynamic Forms**:
+```svelte
+{#each metadata.inputFields as field}
+    <Component 
+        this={getInputComponent(field.type)} 
+        {field} 
+        bind:value={formData[field.id]}
+    />
+{/each}
+```
+
+## Custom Properties Pattern
+
+Components use `customProperties` to pass configuration from server to client:
+
+```csharp
+// Server-side
+public class DropdownAttribute : ComponentConfigurationAttribute
+{
+    [ConfigurationProperty("Items")]
+    public List<DropdownItem> Items { get; set; }
+    
+    [ConfigurationProperty("Source")]
+    public string Source { get; set; }
+}
+```
+
+```typescript
+// Client-side
+function DropdownInput({ field }) {
+    const items = field.customProperties.Items;
+    const source = field.customProperties.Source;
+    
+    // Render dropdown with items or fetch from source
+}
+```
+
+## Event Handlers
+
+Event handlers allow server-defined client-side behavior:
+
+```csharp
+// Server-side
+[BindToOutput("OutputField", "on-change")]
+public DropdownValue<int> Category { get; set; }
+```
+
+```typescript
+// Client-side
+function handleChange(value: any) {
+    field.eventHandlers
+        .filter(h => h.runAt === 'on-change')
+        .forEach(handler => {
+            // Execute handler logic
+            if (handler.customProperties.BindTo) {
+                bindFieldToOutput(handler.customProperties.BindTo);
+            }
+        });
+}
+```
+
+## Best Practices
+
+1. **Use TypeScript classes**: Import from `uimf-core` for type safety
+2. **Component registry pattern**: Map component types to UI components
+3. **Handle unknown types gracefully**: Provide fallback components or error states
+4. **Respect field metadata**: Honor `hidden`, `required`, `orderIndex` properties
+5. **Implement event handlers**: Support the event handler system for dynamic behavior
+6. **Custom properties documentation**: Document what custom properties your components expect
+7. **Validate on client**: Use `required` and other metadata for client-side validation
+8. **Preserve type information**: The `type` property determines which component to render
+
+## Testing Client Integration
+
+```typescript
+import { FormMetadata, InputFieldMetadata } from 'uimf-core';
+
+describe('Form Rendering', () => {
+    it('renders input fields', () => {
+        const metadata = new FormMetadata({
+            id: 'test-form',
+            label: 'Test',
+            inputFields: [
+                {
+                    id: 'name',
+                    label: 'Name',
+                    type: 'text',
+                    required: true,
+                    hidden: false,
+                    orderIndex: 0
+                }
+            ],
+            outputFields: []
+        });
+        
+        const component = render(<Form metadata={metadata} />);
+        
+        expect(component.getByLabelText('Name')).toBeInTheDocument();
+        expect(component.getByLabelText('Name')).toBeRequired();
+    });
+});
+```
+
+## Next Steps
+
+- Explore the [uimf-svelte](https://github.com/unops/uimf-svelte) reference implementation
+- Learn how to [create custom components](/advanced/custom-components) on the server
+- Understand [metadata factories](/advanced/metadata-factories) for complex metadata
+- Review [dependency injection](/advanced/dependency-injection) patterns

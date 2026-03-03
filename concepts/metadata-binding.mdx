@@ -1,0 +1,537 @@
+---
+title: "Metadata Binding"
+description: "How metadata binding and reflection work in UI Metadata Framework"
+---
+
+## What is Metadata Binding?
+
+Metadata binding is the process of converting C# classes and attributes into metadata that clients can use to render UIs. The `MetadataBinder` class uses reflection to scan your code, extract attribute information, and build a complete picture of your forms and components.
+
+## The MetadataBinder Class
+
+The `MetadataBinder` is the core of the framework. It manages:
+
+1. **Component bindings**: Mappings between C# types and UI components
+2. **Field collections**: Input and output field registries
+3. **Assembly scanning**: Automatic discovery of forms and components
+
+```csharp /home/daytona/workspace/source/UiMetadataFramework.Core/Binding/MetadataBinder.cs:13-69
+public class MetadataBinder
+{
+    public readonly IServiceProvider Container;
+    public readonly FieldCollection Inputs;
+    public readonly FieldCollection Outputs;
+
+    public MetadataBinder()
+        : this(DependencyInjectionContainer.Default)
+    {
+    }
+
+    public MetadataBinder(IServiceProvider container, MetadataBinderConfiguration? config = null)
+    {
+        this.Container = container;
+
+        this.Config = config ?? new MetadataBinderConfiguration(
+            new InputFieldMetadataFactory(),
+            new DefaultFieldMetadataFactory());
+
+        this.Inputs = new(
+            this,
+            container,
+            this.Config.InputFieldMetadataFactory,
+            ComponentCategories.Input);
+
+        this.Outputs = new(
+            this,
+            container,
+            this.Config.OutputFieldMetadataFactory,
+            ComponentCategories.Output);
+    }
+}
+```
+
+### Component Categories
+
+The framework organizes components into categories:
+
+```csharp /home/daytona/workspace/source/UiMetadataFramework.Core/Binding/MetadataBinder.cs:215-226
+public static class ComponentCategories
+{
+    public const string Output = "output";
+    public const string Input = "input";
+}
+```
+
+Each category has its own `FieldCollection` that manages bindings for that type of component.
+
+## Registering Assemblies
+
+Before the `MetadataBinder` can generate metadata, you need to register assemblies containing your components:
+
+```csharp
+var binder = new MetadataBinder();
+
+// Register assembly with component bindings
+binder.RegisterAssembly(typeof(StringInputComponentBinding).Assembly);
+```
+
+The `RegisterAssembly` method scans the assembly for:
+
+1. **ComponentBinding classes**: Manual component bindings
+2. **Classes with ComponentAttribute**: Automatic component bindings
+
+```csharp /home/daytona/workspace/source/UiMetadataFramework.Core/Binding/MetadataBinder.cs:161-210
+public void RegisterAssembly(Assembly assembly)
+{
+    // Avoid registering the same assembly twice
+    lock (this.key)
+    {
+        if (this.registeredAssemblies.Contains(assembly.FullName))
+        {
+            return;
+        }
+
+        this.registeredAssemblies.Add(assembly.FullName);
+    }
+
+    var bindings = assembly
+        .GetBindings<ComponentBinding>()
+        .Select(Activator.CreateInstance)
+        .Cast<ComponentBinding>()
+        .ToList();
+
+    var components = assembly.GetComponents<ComponentAttribute>()
+        .ToList();
+
+    bindings
+        .Where(t => t.Category == ComponentCategories.Output)
+        .ForEach(t => this.Outputs.Bindings.AddBinding(t));
+
+    bindings
+        .Where(t => t.Category == ComponentCategories.Input)
+        .ForEach(t => this.Inputs.Bindings.AddBinding(t));
+
+    components
+        .Where(t => t.Attribute.Category == ComponentCategories.Output)
+        .ForEach(
+            t => this.Outputs.Bindings.AddBinding(
+                new ComponentBinding(
+                    t.Attribute.Category,
+                    [t.Type],
+                    t.Attribute,
+                    t.AllowedConfigurations)));
+
+    components
+        .Where(t => t.Attribute.Category == ComponentCategories.Input)
+        .ForEach(
+            t => this.Inputs.Bindings.AddBinding(
+                new ComponentBinding(
+                    t.Attribute.Category,
+                    [t.Type],
+                    t.Attribute,
+                    t.AllowedConfigurations)));
+}
+```
+
+<Info>
+The same assembly can be registered multiple times safely. The `MetadataBinder` tracks registered assemblies and ignores duplicates.
+</Info>
+
+## ComponentBinding
+
+A `ComponentBinding` maps one or more server types to a client component:
+
+```csharp /home/daytona/workspace/source/UiMetadataFramework.Core/Binding/Component/ComponentBinding.cs:10-59
+public class ComponentBinding : IComponentBinding
+{
+    public ComponentBinding(
+        string category,
+        Type serverType,
+        string componentType,
+        Type? metadataFactory,
+        params HasConfigurationAttribute[] allowedConfigurations)
+    {
+        this.Category = category;
+        this.serverTypes = [serverType];
+        this.ComponentType = componentType;
+        this.MetadataFactory = metadataFactory;
+        this.AllowedConfigurations = allowedConfigurations;
+    }
+
+    public string Category { get; }
+    public string ComponentType { get; }
+    public Type? MetadataFactory { get; }
+    public IEnumerable<Type> ServerTypes => this.serverTypes;
+    public HasConfigurationAttribute[] AllowedConfigurations { get; }
+}
+```
+
+### Creating a ComponentBinding
+
+There are two ways to create bindings:
+
+#### 1. Manual Binding Class
+
+Create a class that inherits from `ComponentBinding`:
+
+```csharp /home/daytona/workspace/source/UiMetadataFramework.Basic/Inputs/Text/StringInputComponentBinding.cs
+public class StringInputComponentBinding : ComponentBinding
+{
+    internal const string ControlName = "text";
+
+    public StringInputComponentBinding() : base(
+        MetadataBinder.ComponentCategories.Input,
+        serverType: typeof(string),
+        componentType: "text",
+        metadataFactory: null)
+    {
+    }
+}
+```
+
+This creates a binding that:
+- Maps `string` → `"text"` component
+- In the `Input` category
+- With no custom metadata factory
+
+#### 2. Component Attribute
+
+Decorate your class with `ComponentAttribute` (or a derived attribute):
+
+```csharp
+[Component(MetadataBinder.ComponentCategories.Output, "my-component")]
+public class MyComponent
+{
+    public string Title { get; set; }
+    public string Description { get; set; }
+}
+```
+
+When you register the assembly, the `MetadataBinder` automatically creates a binding.
+
+## Reflection and Attribute Discovery
+
+The framework uses reflection extensively to discover forms and fields:
+
+### Form Discovery
+
+```csharp /home/daytona/workspace/source/UiMetadataFramework.Core/Binding/MetadataBinder.cs:126-140
+public static string GetFormId(Type formType)
+{
+    var attribute = formType.GetTypeInfo().GetCustomAttributeSingleOrDefault<FormAttribute>();
+
+    if (attribute == null)
+    {
+        throw new BindingException(
+            $"Type '{formType.FullName}' does not have mandatory " +
+            $"attribute '{typeof(FormAttribute).FullName}'.");
+    }
+
+    return !string.IsNullOrWhiteSpace(attribute.Id)
+        ? attribute.Id!
+        : formType.FullName ?? throw new BindingException($"Cannot form ID for type `{formType}`.");
+}
+```
+
+This method:
+1. Uses reflection to get the `FormAttribute`
+2. Extracts the `Id` property
+3. Falls back to the full type name if `Id` is not set
+
+### Field Discovery
+
+The framework scans request and response classes for properties with field attributes:
+
+```csharp
+// Pseudocode for field discovery
+foreach (var property in requestType.GetProperties())
+{
+    var inputField = property.GetCustomAttribute<InputFieldAttribute>();
+    if (inputField != null)
+    {
+        var metadata = CreateFieldMetadata(property, inputField);
+        inputFields.Add(metadata);
+    }
+}
+```
+
+For each property with `InputFieldAttribute` or `OutputFieldAttribute`:
+1. Extract the attribute properties (Label, Required, OrderIndex, etc.)
+2. Determine the component type based on the property type
+3. Create `FieldMetadata` with all the information
+4. Add to the appropriate collection
+
+## Base Component Resolution
+
+The framework supports component inheritance. You can create derived components:
+
+```csharp /home/daytona/workspace/source/UiMetadataFramework.Core/Binding/MetadataBinder.cs:84-119
+public static Type? GetBaseComponent<TAttribute>(Type component) where TAttribute : ComponentAttribute
+{
+    return BaseComponentCache.GetOrAdd(
+        component,
+        _ =>
+        {
+            int levels = 0;
+
+            while (true)
+            {
+                if (component.GetCustomAttribute<TAttribute>(inherit: false) != null)
+                {
+                    if (levels > 1)
+                    {
+                        throw new BindingException(
+                            $"Derived component '{component.FullName}' cannot inherit from another derived component. " +
+                            $"Multi-level derived components are not supported.");
+                    }
+
+                    return component;
+                }
+
+                if (component.BaseType == null || component.BaseType == typeof(object))
+                {
+                    return null;
+                }
+
+                component = component.BaseType;
+
+                if (!component.IsAbstract)
+                {
+                    levels += 1;
+                }
+            }
+        });
+}
+```
+
+This method:
+- Walks up the inheritance chain
+- Finds the class with the `ComponentAttribute`
+- Ensures only single-level inheritance (no multi-level derived components)
+- Caches results for performance
+
+<Note>
+You can derive from a component once, but not create multi-level inheritance. This keeps the binding system simple and predictable.
+</Note>
+
+## Metadata Generation Flow
+
+Here's the complete flow from C# class to JSON metadata:
+
+```
+1. Developer defines form class with attributes
+   ↓
+2. RegisterAssembly() scans for component bindings
+   ↓
+3. FormRegister.RegisterForm() scans form class
+   ↓
+4. Reflection extracts FormAttribute properties
+   ↓
+5. Reflection scans Request class for InputFields
+   ↓
+6. Reflection scans Response class for OutputFields
+   ↓
+7. For each field:
+   - Get property type
+   - Look up ComponentBinding for that type
+   - Create FieldMetadata with component info
+   - Add custom properties from attributes
+   ↓
+8. Build complete FormMetadata object
+   ↓
+9. Serialize to JSON
+   ↓
+10. Send to client
+```
+
+## FieldCollection
+
+The `FieldCollection` manages component bindings for a category:
+
+```csharp
+public class FieldCollection
+{
+    public readonly BindingCollection Bindings;
+    public readonly string Category;
+    
+    public FieldMetadata GetFieldMetadata(
+        PropertyInfo property,
+        FieldAttribute? attribute,
+        MetadataBinder binder)
+    {
+        // 1. Get the property type
+        var propertyType = property.PropertyType;
+        
+        // 2. Find the binding for that type
+        var binding = this.Bindings.GetBinding(propertyType);
+        
+        // 3. Create component metadata
+        var component = new Component(
+            type: binding.ComponentType,
+            serverType: propertyType.FullName,
+            configuration: CreateConfiguration(binding, property));
+        
+        // 4. Create field metadata
+        var field = new FieldMetadata(component)
+        {
+            Id = property.Name,
+            Label = attribute?.Label ?? property.Name,
+            OrderIndex = attribute?.OrderIndex ?? 0,
+            Hidden = attribute?.Hidden ?? false
+        };
+        
+        return field;
+    }
+}
+```
+
+## Custom Metadata Factories
+
+For complex components, you can provide a custom metadata factory:
+
+```csharp
+public class MyMetadataFactory : IMetadataFactory
+{
+    public object? GetMetadata(
+        PropertyInfo property,
+        IComponentBinding binding)
+    {
+        // Extract custom configuration from attributes
+        var config = property.GetCustomAttribute<MyConfigAttribute>();
+        
+        return new
+        {
+            MaxLength = config?.MaxLength ?? 100,
+            Pattern = config?.Pattern,
+            Placeholder = config?.Placeholder
+        };
+    }
+}
+
+public class MyComponentBinding : ComponentBinding
+{
+    public MyComponentBinding() : base(
+        MetadataBinder.ComponentCategories.Input,
+        typeof(string),
+        "my-input",
+        metadataFactory: typeof(MyMetadataFactory))  // Custom factory
+    {
+    }
+}
+```
+
+The factory's `GetMetadata` method is called when generating field metadata, allowing you to add component-specific configuration.
+
+## Configuration System
+
+Components can have configuration objects that customize their behavior:
+
+```csharp
+public class Component
+{
+    public Component(
+        string type,
+        string serverType,
+        object? configuration = null)
+    {
+        this.Type = type;
+        this.ServerType = serverType;
+        this.Configuration = configuration;
+    }
+
+    public string Type { get; }
+    public string ServerType { get; }
+    public object? Configuration { get; }
+}
+```
+
+From the source:
+
+```csharp /home/daytona/workspace/source/UiMetadataFramework.Core/Component.cs
+public class Component(
+    string type,
+    string serverType,
+    object? configuration = null)
+{
+    public object? Configuration { get; } = configuration;
+    public string ServerType { get; } = serverType;
+    public string Type { get; } = type;
+}
+```
+
+Configuration can be:
+- `null` for simple components
+- A simple object with properties
+- Generated by a metadata factory
+
+## Dependency Injection
+
+The `MetadataBinder` supports dependency injection:
+
+```csharp
+var services = new ServiceCollection();
+services.AddSingleton<IMyService, MyService>();
+var serviceProvider = services.BuildServiceProvider();
+
+var binder = new MetadataBinder(serviceProvider);
+```
+
+Metadata factories and component bindings can request services through the container:
+
+```csharp
+public class MyMetadataFactory : IMetadataFactory
+{
+    private readonly IMyService service;
+
+    public MyMetadataFactory(IMyService service)
+    {
+        this.service = service;
+    }
+
+    public object? GetMetadata(
+        PropertyInfo property,
+        IComponentBinding binding)
+    {
+        // Use injected service
+        return this.service.GetConfiguration(property);
+    }
+}
+```
+
+<Tip>
+Use dependency injection when your metadata factories need access to configuration, databases, or other services.
+</Tip>
+
+## Best Practices
+
+<CardGroup cols={2}>
+  <Card title="Register Once" icon="check">
+    Register assemblies once at application startup for best performance
+  </Card>
+  <Card title="Cache MetadataBinder" icon="database">
+    Reuse the same `MetadataBinder` instance - don't create new ones per request
+  </Card>
+  <Card title="Custom Factories" icon="industry">
+    Use metadata factories for complex component configuration
+  </Card>
+  <Card title="Type Safety" icon="shield">
+    Leverage C# types - the framework handles the mapping
+  </Card>
+</CardGroup>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Forms" icon="file-lines" href="/concepts/forms">
+    Learn how forms use metadata binding
+  </Card>
+  <Card title="Input Fields" icon="pen-to-square" href="/concepts/input-fields">
+    See how input fields are discovered
+  </Card>
+  <Card title="Output Fields" icon="display" href="/concepts/output-fields">
+    Understand output field metadata generation
+  </Card>
+  <Card title="Custom Components" icon="puzzle-piece" href="/advanced/custom-components">
+    Create custom component bindings
+  </Card>
+</CardGroup>

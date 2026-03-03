@@ -1,0 +1,417 @@
+---
+title: "Input Components"
+description: "Guide to using different input component types in UI Metadata Framework"
+---
+
+UIMetadataFramework.Basic provides a variety of input components for collecting user data. Each component is automatically selected based on the property type or can be explicitly specified using wrapper types.
+
+## Text Input
+
+The text input component is used for single-line text fields.
+
+**Component type:** `text`
+
+**Property type:** `string`
+
+```csharp
+using UiMetadataFramework.Core.Binding;
+
+public class MyRequest
+{
+    [InputField(Label = "First name", Required = true)]
+    public string? FirstName { get; set; }
+
+    [InputField(Label = "Email address")]
+    public string? Email { get; set; }
+}
+```
+
+**When to use:** Single-line text inputs like names, emails, URLs, or any short text value.
+
+## Textarea Input
+
+The textarea component is used for multi-line text input.
+
+**Component type:** `textarea`
+
+**Property type:** `TextareaValue`
+
+```csharp
+using UiMetadataFramework.Basic.Inputs.Textarea;
+using UiMetadataFramework.Core.Binding;
+
+public class MyRequest
+{
+    [InputField(Label = "Comments")]
+    public TextareaValue? Comments { get; set; }
+
+    [InputField(Label = "Description", Required = true)]
+    public TextareaValue? Description { get; set; }
+}
+```
+
+**When to use:** Multi-line text like descriptions, comments, notes, or any longer text content.
+
+## Number Input
+
+The number input component handles numeric values.
+
+**Component type:** `number`
+
+**Property types:** `int`, `decimal`, `double`, `short`, `long`, `byte`
+
+```csharp
+using UiMetadataFramework.Core.Binding;
+
+public class MyRequest
+{
+    [InputField(Label = "Age")]
+    public int? Age { get; set; }
+
+    [InputField(Label = "Price", Required = true)]
+    public decimal Price { get; set; }
+
+    [InputField(Label = "Quantity")]
+    public long? Quantity { get; set; }
+}
+```
+
+**When to use:** Any numeric input like age, price, quantity, weight, etc.
+
+## Boolean Input
+
+The boolean input component renders as a checkbox.
+
+**Component type:** `boolean`
+
+**Property type:** `bool`
+
+```csharp
+using UiMetadataFramework.Core.Binding;
+
+public class MyRequest
+{
+    [InputField(Label = "Subscribe to newsletter")]
+    public bool SubscribeToNewsletter { get; set; }
+
+    [InputField(Label = "I agree to the terms", Required = true)]
+    public bool AcceptTerms { get; set; }
+}
+```
+
+**When to use:** Yes/no questions, toggles, or any binary choice.
+
+## DateTime Input
+
+The datetime input component provides a date/time picker.
+
+**Component type:** `datetime`
+
+**Property type:** `DateTime`
+
+```csharp
+using System;
+using UiMetadataFramework.Core.Binding;
+
+public class MyRequest
+{
+    [InputField(Label = "Birth date")]
+    public DateTime? BirthDate { get; set; }
+
+    [InputField(Label = "Appointment time", Required = true)]
+    public DateTime AppointmentTime { get; set; }
+}
+```
+
+**When to use:** Date selection, date/time selection, timestamps.
+
+## Password Input
+
+The password input component masks the entered text.
+
+**Component type:** `password`
+
+**Property type:** `Password`
+
+```csharp
+using UiMetadataFramework.Basic.Inputs.Password;
+using UiMetadataFramework.Core.Binding;
+
+public class LoginRequest
+{
+    [InputField(Label = "Username", Required = true)]
+    public string? Username { get; set; }
+
+    [InputField(Label = "Password", Required = true)]
+    public Password? Password { get; set; }
+}
+```
+
+Access the password value using the `Value` property:
+
+```csharp
+protected override LoginResponse Handle(LoginRequest request)
+{
+    var passwordValue = request.Password?.Value;
+    // Authenticate user with passwordValue
+}
+```
+
+**When to use:** Password fields, PINs, or any sensitive text that should be masked.
+
+## Dropdown Input
+
+The dropdown component provides a select list with predefined options.
+
+**Component type:** `dropdown`
+
+**Property type:** `DropdownValue<T>`
+
+### Inline Source (Static List)
+
+Use `IDropdownInlineSource` for a static list of items:
+
+```csharp
+using System.Collections.Generic;
+using UiMetadataFramework.Basic.Inputs.Dropdown;
+using UiMetadataFramework.Core.Binding;
+
+// Define the dropdown source
+public class GenderSource : IDropdownInlineSource
+{
+    public IEnumerable<DropdownItem> GetItems()
+    {
+        return new[]
+        {
+            new DropdownItem("Female", "female"),
+            new DropdownItem("Male", "male"),
+            new DropdownItem("Other", "other")
+        };
+    }
+}
+
+// Use in your request
+public class MyRequest
+{
+    [InputField(Label = "Gender")]
+    [Dropdown(typeof(GenderSource))]
+    public DropdownValue<string>? Gender { get; set; }
+}
+```
+
+### Enum Source
+
+Use `EnumSource<T>` to automatically populate a dropdown from an enum:
+
+```csharp
+using System;
+using UiMetadataFramework.Basic.Inputs.Dropdown;
+using UiMetadataFramework.Core.Binding;
+
+public enum DayOfWeek
+{
+    Monday,
+    Tuesday,
+    Wednesday,
+    Thursday,
+    Friday,
+    Saturday,
+    Sunday
+}
+
+public class MyRequest
+{
+    [InputField(Label = "Preferred day")]
+    [Dropdown(typeof(EnumSource<DayOfWeek>))]
+    public DropdownValue<DayOfWeek>? PreferredDay { get; set; }
+}
+```
+
+### Remote Source
+
+Use `ITypeaheadRemoteSource` for dynamic data loaded from a server:
+
+```csharp
+using UiMetadataFramework.Basic.Inputs.Dropdown;
+using UiMetadataFramework.Basic.Inputs.Typeahead;
+using UiMetadataFramework.Core.Binding;
+
+[Form]
+public class CountrySource : ITypeaheadRemoteSource
+{
+    // Implementation loads countries from server
+}
+
+public class MyRequest
+{
+    [InputField(Label = "Country")]
+    [Dropdown(typeof(CountrySource))]
+    public DropdownValue<string>? Country { get; set; }
+}
+```
+
+Access the selected value:
+
+```csharp
+protected override MyResponse Handle(MyRequest request)
+{
+    var selectedGender = request.Gender?.Value; // Returns "male", "female", or "other"
+}
+```
+
+**When to use:** Single selection from a predefined list of options.
+
+## Typeahead Input
+
+The typeahead component provides autocomplete functionality with search.
+
+**Component type:** `typeahead`
+
+**Property type:** `TypeaheadValue<T>`
+
+```csharp
+using UiMetadataFramework.Basic.Inputs.Typeahead;
+using UiMetadataFramework.Basic.Inputs.Dropdown;
+using UiMetadataFramework.Core.Binding;
+
+// Define remote source
+[Form]
+public class UserSearchSource : ITypeaheadRemoteSource
+{
+    // Implementation searches users based on query
+}
+
+// Use in your request
+public class MyRequest
+{
+    [InputField(Label = "Search users")]
+    [Typeahead(typeof(UserSearchSource))]
+    public TypeaheadValue<int>? UserId { get; set; }
+}
+```
+
+Access the selected value:
+
+```csharp
+protected override MyResponse Handle(MyRequest request)
+{
+    var selectedUserId = request.UserId?.Value;
+}
+```
+
+**When to use:** Searchable dropdowns, autocomplete fields, or when the list of options is too large for a regular dropdown.
+
+## Complete Example
+
+Here's a complete form demonstrating all input components:
+
+```csharp
+using System;
+using System.Collections.Generic;
+using MediatR;
+using UiMetadataFramework.Basic.Inputs.Dropdown;
+using UiMetadataFramework.Basic.Inputs.Password;
+using UiMetadataFramework.Basic.Inputs.Textarea;
+using UiMetadataFramework.Basic.Inputs.Typeahead;
+using UiMetadataFramework.Basic.Server;
+using UiMetadataFramework.Core.Binding;
+
+public enum UserRole
+{
+    Admin,
+    User,
+    Guest
+}
+
+public class DepartmentSource : IDropdownInlineSource
+{
+    public IEnumerable<DropdownItem> GetItems()
+    {
+        return new[]
+        {
+            new DropdownItem("Engineering", "eng"),
+            new DropdownItem("Sales", "sales"),
+            new DropdownItem("Marketing", "marketing")
+        };
+    }
+}
+
+public class CreateEmployeeRequest : IRequest<CreateEmployeeResponse>
+{
+    // Text input
+    [InputField(Label = "First name", OrderIndex = 1, Required = true)]
+    public string? FirstName { get; set; }
+
+    [InputField(Label = "Last name", OrderIndex = 2, Required = true)]
+    public string? LastName { get; set; }
+
+    [InputField(Label = "Email", OrderIndex = 3, Required = true)]
+    public string? Email { get; set; }
+
+    // Number input
+    [InputField(Label = "Age", OrderIndex = 4)]
+    public int? Age { get; set; }
+
+    [InputField(Label = "Salary", OrderIndex = 5, Required = true)]
+    public decimal Salary { get; set; }
+
+    // Boolean input
+    [InputField(Label = "Active employee", OrderIndex = 6)]
+    public bool IsActive { get; set; }
+
+    // DateTime input
+    [InputField(Label = "Start date", OrderIndex = 7, Required = true)]
+    public DateTime StartDate { get; set; }
+
+    // Password input
+    [InputField(Label = "Initial password", OrderIndex = 8, Required = true)]
+    public Password? InitialPassword { get; set; }
+
+    // Dropdown with enum source
+    [InputField(Label = "Role", OrderIndex = 9, Required = true)]
+    [Dropdown(typeof(EnumSource<UserRole>))]
+    public DropdownValue<UserRole>? Role { get; set; }
+
+    // Dropdown with custom source
+    [InputField(Label = "Department", OrderIndex = 10, Required = true)]
+    [Dropdown(typeof(DepartmentSource))]
+    public DropdownValue<string>? Department { get; set; }
+
+    // Textarea input
+    [InputField(Label = "Notes", OrderIndex = 11)]
+    public TextareaValue? Notes { get; set; }
+}
+
+public class CreateEmployeeResponse : FormResponse
+{
+    public int EmployeeId { get; set; }
+    public string Message { get; set; }
+}
+
+[Form(Id = "create-employee", Label = "Create Employee")]
+public class CreateEmployeeForm : Form<CreateEmployeeRequest, CreateEmployeeResponse>
+{
+    protected override CreateEmployeeResponse Handle(CreateEmployeeRequest request)
+    {
+        // Process the employee creation
+        var employeeId = 123; // Save to database
+
+        return new CreateEmployeeResponse
+        {
+            EmployeeId = employeeId,
+            Message = $"Employee {request.FirstName} {request.LastName} created successfully."
+        };
+    }
+}
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Output Components" icon="display" href="/guides/output-components">
+    Display results with output components
+  </Card>
+  <Card title="Event Handlers" icon="bolt" href="/guides/event-handlers">
+    Add field interactivity
+  </Card>
+</CardGroup>

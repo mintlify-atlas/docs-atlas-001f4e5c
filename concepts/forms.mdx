@@ -1,0 +1,350 @@
+---
+title: "Forms"
+description: "Deep dive into forms and the FormAttribute"
+---
+
+## What is a Form?
+
+A form represents a complete user interaction in UI Metadata Framework. Each form defines:
+- **Input fields**: Data the user provides
+- **Output fields**: Data returned by the server
+- **Behavior**: How the form should behave (auto-submit, modal behavior, etc.)
+- **Metadata**: Labels, IDs, and custom properties
+
+## FormAttribute
+
+The `FormAttribute` is used to decorate form classes and configure their behavior:
+
+```csharp /home/daytona/workspace/source/UiMetadataFramework.Core/Binding/Form/FormAttribute.cs
+public class FormAttribute : Attribute
+{
+    public string? Id { get; set; }
+    public string? Label { get; set; }
+    public bool PostOnLoad { get; set; }
+    public bool PostOnLoadValidation { get; set; } = true;
+    public bool CloseOnPostIfModal { get; set; } = true;
+}
+```
+
+### Form Properties
+
+#### Id
+
+Unique identifier for the form. If not specified, the fully-qualified type name is used.
+
+```csharp
+[Form(Id = "user-registration")]
+public class RegisterUser : Form<Request, Response>
+{
+    // ...
+}
+```
+
+<Info>
+Using explicit IDs makes your API more stable. Type names can change during refactoring, but explicit IDs remain constant.
+</Info>
+
+#### Label
+
+Human-readable label displayed in the UI:
+
+```csharp
+[Form(Label = "User Registration Form")]
+public class RegisterUser : Form<Request, Response>
+{
+    // ...
+}
+```
+
+#### PostOnLoad
+
+When `true`, the form is automatically submitted when loaded. Perfect for reports and dashboards:
+
+```csharp
+[Form(Label = "Sales Report", PostOnLoad = true)]
+public class SalesReport : Form<Request, Response>
+{
+    // Form auto-submits on load to display data
+}
+```
+
+<Tip>
+Use `PostOnLoad = true` for read-only forms that display data without requiring user input.
+</Tip>
+
+#### PostOnLoadValidation
+
+Controls whether validation runs during the initial `PostOnLoad` submission:
+
+```csharp
+[Form(
+    PostOnLoad = true, 
+    PostOnLoadValidation = false  // Skip validation on initial load
+)]
+public class Dashboard : Form<Request, Response>
+{
+    // ...
+}
+```
+
+Default is `true`. Set to `false` if you want to submit with default/empty values on initial load.
+
+#### CloseOnPostIfModal
+
+Controls modal behavior when the form is displayed as a modal dialog:
+
+```csharp
+[Form(
+    Label = "Quick Action",
+    CloseOnPostIfModal = true  // Auto-close modal after submission
+)]
+public class QuickAction : Form<Request, Response>
+{
+    // ...
+}
+```
+
+- `true` (default): Modal closes automatically after successful submission
+- `false`: Modal remains open (useful for multi-step workflows)
+
+## Form Structure
+
+A typical form consists of three parts:
+
+### 1. Form Class
+
+Inherits from `Form<TRequest, TResponse>` and implements the handler:
+
+```csharp
+[Form(Id = "Magic", Label = "Do some magic", PostOnLoad = false)]
+public class Magic : Form<Magic.Request, Magic.Response>
+{
+    protected override Response Handle(Request request)
+    {
+        // Process the request
+        return new Response
+        {
+            FirstName = request.FirstName,
+            DateOfBirth = request.DateOfBirth
+        };
+    }
+}
+```
+
+### 2. Request Class
+
+Defines input fields using `InputFieldAttribute`:
+
+```csharp
+public class Request : IRequest<Response>
+{
+    [InputField(Label = "First name", OrderIndex = 1, Required = true)]
+    public string FirstName { get; set; }
+
+    [InputField(Label = "DoB", OrderIndex = 2, Required = true)]
+    public DateTime DateOfBirth { get; set; }
+
+    [InputField(Hidden = true)]
+    public int Height { get; set; }
+}
+```
+
+### 3. Response Class
+
+Defines output fields using `OutputFieldAttribute`:
+
+```csharp
+public class Response : FormResponse<FormResponseMetadata>
+{
+    [OutputField(Label = "First name", OrderIndex = 1)]
+    public string? FirstName { get; set; }
+
+    [OutputField(Label = "DoB", OrderIndex = 2)]
+    public DateTime? DateOfBirth { get; set; }
+
+    [OutputField(Hidden = true)]
+    public int Height { get; set; }
+}
+```
+
+## Custom Form Properties
+
+You can extend `FormAttribute` to add custom metadata:
+
+```csharp
+public class MyFormAttribute : FormAttribute
+{
+    public override IDictionary<string, object?> GetCustomProperties(Type type)
+    {
+        var menuAttribute = type.GetTypeInfo()
+            .GetCustomAttribute<MenuAttribute>();
+
+        return new Dictionary<string, object?>
+        {
+            { "ParentMenu", menuAttribute?.ParentMenu }
+        };
+    }
+}
+
+public class MenuAttribute : Attribute
+{
+    public MenuAttribute(string parentMenu)
+    {
+        this.ParentMenu = parentMenu;
+    }
+
+    public string ParentMenu { get; set; }
+}
+
+[MyForm(Label = "User Management")]
+[Menu("Admin")]
+public class UserManagement : Form<Request, Response>
+{
+    // The generated metadata will include:
+    // { "ParentMenu": "Admin" }
+}
+```
+
+<Note>
+Custom properties are serialized to JSON and sent to the client, allowing you to extend the framework with application-specific metadata.
+</Note>
+
+## Form Registration
+
+Forms must be registered with the `FormRegister`:
+
+```csharp
+var binder = new MetadataBinder();
+binder.RegisterAssembly(typeof(StringInputComponentBinding).Assembly);
+
+var formRegister = new FormRegister(binder);
+formRegister.RegisterForm(typeof(Magic));
+
+// Get form metadata
+var formInfo = formRegister.GetFormInfo(typeof(Magic));
+var metadata = formInfo.Metadata;
+
+// Access metadata properties
+Console.WriteLine(metadata.Id);                    // "Magic"
+Console.WriteLine(metadata.Label);                 // "Do some magic"
+Console.WriteLine(metadata.PostOnLoad);            // false
+Console.WriteLine(metadata.InputFields.Count);     // 5
+Console.WriteLine(metadata.OutputFields.Count);    // 4
+```
+
+## Form ID Resolution
+
+The framework resolves form IDs in this order:
+
+1. Explicit `Id` property in `FormAttribute`
+2. Fully-qualified type name
+
+```csharp
+// Explicit ID
+[Form(Id = "custom-id")]
+public class MyForm { } // ID: "custom-id"
+
+// Derived from type name
+[Form]
+public class MyForm { } // ID: "Namespace.MyForm"
+```
+
+<Info>
+Form IDs must be unique within your application. Attempting to register two forms with the same ID will throw an `InvalidConfigurationException`.
+</Info>
+
+## Complete Example
+
+Here's a complete form from the test suite:
+
+```csharp /home/daytona/workspace/source/UiMetadataFramework.Tests/MediatrTests.cs:87-92
+[MyForm(Id = "Magic", Label = "Do some magic", PostOnLoad = false, CloseOnPostIfModal = true)]
+[Menu("Magical tools")]
+public class Magic : BaseForm
+{
+    protected override Response Handle(Request request)
+    {
+        return new Response
+        {
+            FirstName = request.FirstName,
+            DateOfBirth = request.DateOfBirth
+        };
+    }
+
+    public class Request : IRequest<Response>
+    {
+        [InputField(Label = "First name", OrderIndex = 1, Required = true)]
+        public string FirstName { get; set; }
+
+        [InputField(Label = "DoB", OrderIndex = 2, Required = true)]
+        public DateTime DateOfBirth { get; set; }
+
+        [InputField(Hidden = true)]
+        public int Height { get; set; }
+
+        [InputField(Hidden = true)]
+        public decimal Weight { get; set; }
+    }
+
+    public class Response : FormResponse<FormResponseMetadata>
+    {
+        [OutputField(Label = "First name", OrderIndex = 1)]
+        public string? FirstName { get; set; }
+
+        [OutputField(Label = "DoB", OrderIndex = 2)]
+        public DateTime? DateOfBirth { get; set; }
+
+        [OutputField(Hidden = true)]
+        public int Height { get; set; }
+
+        [OutputField(Hidden = true)]
+        public decimal Weight { get; set; }
+    }
+}
+```
+
+## Form Events
+
+Forms support event handlers that run at specific points in the form lifecycle:
+
+```csharp
+public class LogFormEvent : Attribute, IFormEventHandlerAttribute
+{
+    public LogFormEvent(string eventName)
+    {
+        this.RunAt = eventName;
+    }
+
+    public string Id { get; } = "log-form-event";
+    public string RunAt { get; }
+
+    public EventHandlerMetadata ToMetadata(Type formType, MetadataBinder binder)
+    {
+        return new EventHandlerMetadata(this.Id, this.RunAt);
+    }
+}
+
+[Form(Label = "My Form")]
+[LogFormEvent(FormEvents.FormLoaded)]
+public class MyForm : Form<Request, Response>
+{
+    // Event handler runs when form loads
+}
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Input Fields" icon="pen-to-square" href="/concepts/input-fields">
+    Learn how to define and validate input fields
+  </Card>
+  <Card title="Output Fields" icon="display" href="/concepts/output-fields">
+    Understand how to structure response data
+  </Card>
+  <Card title="Metadata Binding" icon="link" href="/concepts/metadata-binding">
+    See how forms are converted to metadata
+  </Card>
+  <Card title="Quick Start" icon="rocket" href="/quickstart">
+    Build your first form
+  </Card>
+</CardGroup>

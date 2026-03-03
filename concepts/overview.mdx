@@ -1,0 +1,203 @@
+---
+title: "Architecture Overview"
+description: "Understanding the core architecture of UI Metadata Framework"
+---
+
+## Introduction
+
+UI Metadata Framework is a metadata-driven approach to building user interfaces. Instead of manually creating UI components, you define C# classes with attributes, and the framework automatically generates metadata that client applications use to render the interface.
+
+## Core Architecture
+
+The framework follows a client-server protocol with metadata as the contract between them:
+
+```
+C# Classes → Reflection → Metadata → JSON → Client → UI Rendering
+```
+
+### The Flow
+
+1. **Server-Side Definition**: You define forms using C# classes decorated with attributes
+2. **Metadata Generation**: The `MetadataBinder` uses reflection to scan your classes and generate metadata
+3. **JSON Serialization**: Metadata is serialized to JSON and sent to the client
+4. **Client Rendering**: The client reads the metadata and dynamically renders the appropriate UI components
+
+<Note>
+The framework is **client-agnostic**. Any client that can parse JSON and render components based on metadata can work with the framework.
+</Note>
+
+## Three Core Concepts
+
+The framework is built around three fundamental concepts:
+
+### 1. Forms
+
+Forms are the top-level containers that define complete user interactions. Each form has:
+- Input fields (what the user provides)
+- Output fields (what the server returns)
+- Metadata properties (label, behavior, etc.)
+
+```csharp
+[Form(Label = "User Registration", PostOnLoad = false)]
+public class RegisterUser : Form<RegisterUser.Request, RegisterUser.Response>
+{
+    public class Request : IRequest<Response>
+    {
+        [InputField(Label = "Email", Required = true)]
+        public string Email { get; set; }
+    }
+
+    public class Response : FormResponse
+    {
+        [OutputField(Label = "User ID")]
+        public int UserId { get; set; }
+    }
+}
+```
+
+Learn more in [Forms](/concepts/forms).
+
+### 2. Input Fields
+
+Input fields represent data that users provide. They are decorated with `InputFieldAttribute` and support validation, ordering, and visibility control.
+
+```csharp
+[InputField(Label = "Date of Birth", Required = true, OrderIndex = 2)]
+public DateTime DateOfBirth { get; set; }
+
+[InputField(Hidden = true)]
+public int InternalId { get; set; }
+```
+
+Learn more in [Input Fields](/concepts/input-fields).
+
+### 3. Output Fields
+
+Output fields represent data returned from the server. They are decorated with `OutputFieldAttribute` and control how responses are displayed.
+
+```csharp
+[OutputField(Label = "Full Name", OrderIndex = 1)]
+public string FullName { get; set; }
+
+[OutputField(Hidden = true)]
+public decimal InternalScore { get; set; }
+```
+
+Learn more in [Output Fields](/concepts/output-fields).
+
+## Component Binding System
+
+The framework maps C# types to UI components using the **ComponentBinding** system:
+
+```csharp
+public class StringInputComponentBinding : ComponentBinding
+{
+    public StringInputComponentBinding() : base(
+        MetadataBinder.ComponentCategories.Input,
+        serverType: typeof(string),
+        componentType: "text",
+        metadataFactory: null)
+    {
+    }
+}
+```
+
+This binding tells the framework:
+- `string` properties → render as `"text"` input components
+- The component belongs to the `Input` category
+- No custom metadata factory is needed
+
+<Info>
+You can create custom bindings to map any C# type to any client-side component. This makes the framework highly extensible.
+</Info>
+
+## Metadata Binder
+
+The `MetadataBinder` is the heart of the framework. It:
+
+1. **Registers assemblies** containing forms and components
+2. **Scans for attributes** using reflection
+3. **Builds metadata** from the attributes and type information
+4. **Manages bindings** between server types and client components
+
+```csharp
+var binder = new MetadataBinder();
+
+// Register assemblies containing components
+binder.RegisterAssembly(typeof(StringInputComponentBinding).Assembly);
+
+// The binder now has:
+// - Input field collection (binder.Inputs)
+// - Output field collection (binder.Outputs)
+// - Component bindings for all registered types
+```
+
+Learn more in [Metadata Binding](/concepts/metadata-binding).
+
+## Metadata Categories
+
+The framework organizes components into categories:
+
+```csharp
+public static class ComponentCategories
+{
+    public const string Output = "output";
+    public const string Input = "input";
+}
+```
+
+Each category has its own:
+- **FieldCollection**: Manages component bindings for that category
+- **Attribute types**: `InputFieldAttribute` vs `OutputFieldAttribute`
+- **Metadata factories**: Generate category-specific metadata
+
+## Key Benefits
+
+<CardGroup cols={2}>
+  <Card title="Type Safety" icon="shield">
+    Define your UI contract in strongly-typed C# with compile-time validation
+  </Card>
+  <Card title="Client Agnostic" icon="arrows-split">
+    Support multiple client implementations (web, mobile, desktop) from a single backend
+  </Card>
+  <Card title="Reduced Boilerplate" icon="code">
+    Attributes replace repetitive UI code - the framework handles the rest
+  </Card>
+  <Card title="Extensible" icon="puzzle-piece">
+    Create custom attributes, components, and metadata factories for any use case
+  </Card>
+</CardGroup>
+
+## Form Lifecycle
+
+Understanding the lifecycle helps you leverage the framework effectively:
+
+1. **Registration**: Forms are registered with `FormRegister`
+2. **Metadata Request**: Client requests form metadata by form ID
+3. **Metadata Response**: Server returns JSON metadata describing the form
+4. **User Interaction**: Client renders UI and user fills in input fields
+5. **Form Submission**: Client sends input data to server
+6. **Processing**: Server executes form handler logic
+7. **Response**: Server returns output data with response metadata
+8. **Rendering**: Client renders the response based on metadata
+
+<Tip>
+Use `PostOnLoad = true` on the `FormAttribute` to auto-submit forms when they load. This is perfect for displaying reports or read-only data.
+</Tip>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Forms" icon="file-lines" href="/concepts/forms">
+    Deep dive into form creation and configuration
+  </Card>
+  <Card title="Input Fields" icon="pen-to-square" href="/concepts/input-fields">
+    Learn about input field attributes and validation
+  </Card>
+  <Card title="Output Fields" icon="display" href="/concepts/output-fields">
+    Understand output field configuration and rendering
+  </Card>
+  <Card title="Metadata Binding" icon="link" href="/concepts/metadata-binding">
+    Explore how reflection and binding work
+  </Card>
+</CardGroup>

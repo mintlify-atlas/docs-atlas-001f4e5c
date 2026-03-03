@@ -1,0 +1,353 @@
+---
+title: MetadataBinder
+description: Core class for mapping server-side types to client-side UI components and generating form metadata
+---
+
+## Overview
+
+`MetadataBinder` is the central class in the UI Metadata Framework that holds mappings between server-side types and client-side UI components. It provides APIs to simplify the creation of metadata and manages collections of input and output field bindings.
+
+## Namespace
+
+```csharp
+UiMetadataFramework.Core.Binding
+```
+
+## Properties
+
+<ParamField path="Container" type="IServiceProvider" readonly>
+  Service provider instance used for dependency injection when instantiating components and factories.
+</ParamField>
+
+<ParamField path="Inputs" type="FieldCollection" readonly>
+  Collection of input field bindings. Use this to access and register input components.
+</ParamField>
+
+<ParamField path="Outputs" type="FieldCollection" readonly>
+  Collection of output field bindings. Use this to access and register output components.
+</ParamField>
+
+## Constructors
+
+### Default Constructor
+
+```csharp
+public MetadataBinder()
+```
+
+Initializes a new instance using `DependencyInjectionContainer.Default` as the service provider.
+
+### Constructor with Service Provider
+
+```csharp
+public MetadataBinder(
+    IServiceProvider container,
+    MetadataBinderConfiguration? config = null)
+```
+
+Initializes a new instance with a custom service provider and optional configuration.
+
+<ParamField path="container" type="IServiceProvider">
+  Service provider for dependency injection.
+</ParamField>
+
+<ParamField path="config" type="MetadataBinderConfiguration?">
+  Optional configuration. If `null`, default configuration will be used.
+</ParamField>
+
+## Methods
+
+### RegisterAssembly
+
+```csharp
+public void RegisterAssembly(Assembly assembly)
+```
+
+Scans an assembly for implementations of `ComponentBinding` and registers them. This method automatically discovers and registers all component bindings defined in the assembly.
+
+<ParamField path="assembly" type="Assembly">
+  Assembly to scan for component bindings.
+</ParamField>
+
+### GetFormId
+
+```csharp
+public static string GetFormId(Type formType)
+```
+
+Retrives the unique identifier for a form. If the `FormAttribute.Id` property is specified, it will be used; otherwise, the fully qualified type name is returned.
+
+<ParamField path="formType" type="Type">
+  Type representing the form.
+</ParamField>
+
+**Returns:** Unique identifier for the form.
+
+**Throws:** `BindingException` if the type does not have a `FormAttribute`.
+
+### GetFieldCollection
+
+```csharp
+public FieldCollection GetFieldCollection(string category)
+```
+
+Retrieves the field collection for a specific category.
+
+<ParamField path="category" type="string">
+  Field category (see `ComponentCategories`).
+</ParamField>
+
+**Returns:** `FieldCollection` for the specified category.
+
+**Throws:** `BindingException` if no field collection exists for the category.
+
+### GetBaseComponent\<TAttribute\>
+
+```csharp
+public static Type? GetBaseComponent<TAttribute>(Type component)
+    where TAttribute : ComponentAttribute
+```
+
+Looks into the inheritance chain of a component and finds the class which has the specified attribute applied directly to it. This is useful for working with derived components.
+
+<ParamField path="component" type="Type">
+  Component class or a class deriving from a component class.
+</ParamField>
+
+**Returns:** Class that has the attribute applied directly to it, or `null` if not found.
+
+**Throws:** `BindingException` if multi-level derived components are detected.
+
+## ComponentCategories
+
+Static class containing standard component category constants:
+
+```csharp
+public static class ComponentCategories
+{
+    public const string Input = "input";
+    public const string Output = "output";
+}
+```
+
+## Usage Examples
+
+### Basic Initialization
+
+```csharp
+using UiMetadataFramework.Core.Binding;
+
+// Create a metadata binder with default settings
+var binder = new MetadataBinder();
+
+// Register assemblies containing component bindings
+binder.RegisterAssembly(typeof(BasicComponents).Assembly);
+```
+
+### Registering Custom Components
+
+```csharp
+// Define a custom component binding
+public class CustomTextInputBinding : ComponentBinding
+{
+    public CustomTextInputBinding()
+        : base(
+            category: MetadataBinder.ComponentCategories.Input,
+            serverType: typeof(string),
+            componentType: "custom-text",
+            metadataFactory: null)
+    {
+    }
+}
+
+// Register the assembly containing the binding
+var binder = new MetadataBinder();
+binder.RegisterAssembly(typeof(CustomTextInputBinding).Assembly);
+```
+
+### Getting Form Metadata
+
+```csharp
+[Form(Id = "user-profile", Label = "User Profile")]
+public class UserProfileForm
+{
+    [InputField(Required = true)]
+    public string FirstName { get; set; }
+    
+    [InputField(Required = true)]
+    public string LastName { get; set; }
+    
+    [InputField(Required = true)]
+    public string Email { get; set; }
+}
+
+public class UserProfileResponse
+{
+    [OutputField(Label = "Profile Updated")]
+    public string Message { get; set; }
+}
+
+// Generate metadata for the form
+var binder = new MetadataBinder();
+binder.RegisterAssembly(typeof(UserProfileForm).Assembly);
+
+var formMetadata = binder.BuildForm<UserProfileForm, UserProfileResponse, object>();
+
+// Get form ID
+var formId = MetadataBinder.GetFormId(typeof(UserProfileForm));
+Console.WriteLine(formId); // Output: "user-profile"
+```
+
+### Accessing Input Fields
+
+```csharp
+[Form(Id = "contact")]
+public class ContactForm
+{
+    [InputField(Label = "Name", Required = true, OrderIndex = 1)]
+    public string Name { get; set; }
+    
+    [InputField(Label = "Email", Required = true, OrderIndex = 2)]
+    public string Email { get; set; }
+    
+    [InputField(Label = "Message", Required = true, OrderIndex = 3)]
+    public string Message { get; set; }
+}
+
+var binder = new MetadataBinder();
+binder.RegisterAssembly(typeof(ContactForm).Assembly);
+
+// Get input fields for the form
+var inputFields = binder.Inputs.GetFields(typeof(ContactForm));
+
+foreach (var field in inputFields)
+{
+    Console.WriteLine($"Field: {field.Id}, Type: {field.Type}");
+}
+```
+
+### Using Custom Service Provider
+
+```csharp
+using Microsoft.Extensions.DependencyInjection;
+
+// Set up dependency injection
+var services = new ServiceCollection();
+services.AddSingleton<IMyCustomService, MyCustomService>();
+var serviceProvider = services.BuildServiceProvider();
+
+// Create binder with custom service provider
+var binder = new MetadataBinder(serviceProvider);
+binder.RegisterAssembly(typeof(MyForms).Assembly);
+```
+
+### Working with Field Collections
+
+```csharp
+var binder = new MetadataBinder();
+binder.RegisterAssembly(typeof(MyComponents).Assembly);
+
+// Get input field collection
+var inputCollection = binder.GetFieldCollection(MetadataBinder.ComponentCategories.Input);
+
+// Get output field collection
+var outputCollection = binder.GetFieldCollection(MetadataBinder.ComponentCategories.Output);
+
+// Or access directly
+var inputs = binder.Inputs;
+var outputs = binder.Outputs;
+```
+
+### Finding Base Components
+
+```csharp
+[Component("base-dropdown")]
+public class BaseDropdown<T>
+{
+    public T Value { get; set; }
+    public IEnumerable<T> Options { get; set; }
+}
+
+public class CountryDropdown : BaseDropdown<string>
+{
+    // Additional properties specific to country selection
+}
+
+// Find the base component
+var baseComponent = MetadataBinder.GetBaseComponent<ComponentAttribute>(typeof(CountryDropdown));
+Console.WriteLine(baseComponent.Name); // Output: "BaseDropdown`1"
+```
+
+### Complete Example: Building a Form System
+
+```csharp
+using UiMetadataFramework.Core.Binding;
+using System.Reflection;
+
+public class FormMetadataService
+{
+    private readonly MetadataBinder binder;
+    
+    public FormMetadataService(IServiceProvider serviceProvider)
+    {
+        binder = new MetadataBinder(serviceProvider);
+        
+        // Register all assemblies with form definitions
+        binder.RegisterAssembly(Assembly.GetExecutingAssembly());
+    }
+    
+    public FormMetadata GetFormMetadata<TRequest, TResponse>()
+    {
+        return binder.BuildForm<TRequest, TResponse, object>();
+    }
+    
+    public string GetFormId<TRequest>()
+    {
+        return MetadataBinder.GetFormId(typeof(TRequest));
+    }
+    
+    public IEnumerable<FieldMetadata> GetInputFields<TRequest>()
+    {
+        return binder.Inputs.GetFields(typeof(TRequest));
+    }
+    
+    public IEnumerable<FieldMetadata> GetOutputFields<TResponse>()
+    {
+        return binder.Outputs.GetFields(typeof(TResponse));
+    }
+}
+
+// Usage
+var service = new FormMetadataService(serviceProvider);
+var metadata = service.GetFormMetadata<LoginForm, LoginResponse>();
+var formId = service.GetFormId<LoginForm>();
+```
+
+### Registering Multiple Assemblies
+
+```csharp
+var binder = new MetadataBinder();
+
+// Register multiple assemblies
+binder.RegisterAssembly(typeof(CoreComponents).Assembly);
+binder.RegisterAssembly(typeof(CustomComponents).Assembly);
+binder.RegisterAssembly(typeof(ThirdPartyComponents).Assembly);
+
+// Registering the same assembly multiple times is safe - it will be ignored
+binder.RegisterAssembly(typeof(CoreComponents).Assembly); // No effect
+```
+
+## Notes
+
+- The `MetadataBinder` is thread-safe for registration operations.
+- Assemblies are only registered once, even if `RegisterAssembly()` is called multiple times with the same assembly.
+- Component bindings are automatically discovered from assemblies - you don't need to manually register each binding.
+- The binder supports dependency injection through the `Container` property.
+- Form IDs must be unique across your application.
+
+## See Also
+
+- [ComponentBinding](/api/core/component-binding)
+- [FormAttribute](/api/core/form-attribute)
+- [InputFieldAttribute](/api/core/input-field-attribute)
+- [OutputFieldAttribute](/api/core/output-field-attribute)

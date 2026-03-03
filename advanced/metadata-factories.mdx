@@ -1,0 +1,282 @@
+---
+title: Custom Metadata Factories
+description: Create custom metadata factories to control how component metadata is generated
+---
+
+Metadata factories control how component configuration is transformed into JSON metadata that gets sent to the client. The framework provides a default implementation, but you can create custom factories for advanced scenarios.
+
+## Understanding IMetadataFactory
+
+The `IMetadataFactory` interface (source:UiMetadataFramework.Core/Binding/Component/IMetadataFactory.cs:8) defines a single method:
+
+```csharp
+public interface IMetadataFactory
+{
+    object? CreateMetadata(
+        Type type,                                          // Component's type
+        Type? derivedType,                                  // Derived component type (if any)
+        IComponentBinding binding,                          // Component binding
+        MetadataBinder binder,                              // Metadata binder instance
+        params ComponentConfigurationAttribute[] configurations // Configuration attributes
+    );
+}
+```
+
+## DefaultMetadataFactory
+
+The framework provides `DefaultMetadataFactory` (source:UiMetadataFramework.Core/Binding/Component/DefaultMetadataFactory.cs:11) which handles most scenarios. It:
+
+1. Iterates over all configuration attributes
+2. Finds properties marked with `[ConfigurationProperty]`
+3. Builds a dictionary of configuration values
+4. Validates mandatory configurations
+5. Returns the dictionary as JSON-serializable metadata
+
+### How DefaultMetadataFactory Works
+
+```csharp
+public class DefaultMetadataFactory : IMetadataFactory
+{
+    public object? CreateMetadata(
+        Type type,
+        Type? derivedType,
+        IComponentBinding binding,
+        MetadataBinder binder,
+        params ComponentConfigurationAttribute[] configurations)
+    {
+        var result = new Dictionary<string, object?>();
+        
+        // Process each configuration attribute
+        foreach (var configData in configurations)
+        {
+            var configType = configData.GetType();
+            
+            // Find properties marked with [ConfigurationProperty]
+            var configProperties = configType
+                .GetProperties()
+                .Where(t => t.CanRead)
+                .Select(t => new {
+                    Property = t,
+                    Info = t.GetCustomAttribute<ConfigurationPropertyAttribute>()
+                })
+                .Where(t => t.Info != null);
+            
+            // Add each property value to result dictionary
+            foreach (var property in configProperties)
+            {
+                var value = property.Property.GetValue(configData);
+                result[property.Info.Name] = value;
+            }
+        }
+        
+        // Call AugmentConfiguration for customization
+        this.AugmentConfiguration(type, derivedType, binder, configurations, result);
+        
+        return result.Count == 0 ? null : result;
+    }
+    
+    protected virtual void AugmentConfiguration(
+        Type type,
+        Type? derivedType,
+        MetadataBinder binder,
+        ComponentConfigurationAttribute[] configurations,
+        Dictionary<string, object?> result)
+    {
+        // Override this to customize the configuration
+    }
+}
+```
+
+## Creating Custom Factories
+
+Custom factories are useful when you need to:
+
+- Transform configuration data before sending to client
+- Generate metadata from external sources
+- Add computed properties to metadata
+- Validate complex configuration rules
+
+### Example: DropdownMetadataFactory
+
+Here's a real example from UiMetadataFramework.Basic (source:UiMetadataFramework.Basic/Inputs/Dropdown/DropdownMetadataFactory.cs:16):
+
+```csharp
+public class DropdownMetadataFactory : DefaultMetadataFactory
+{
+    protected override void AugmentConfiguration(
+        Type type,
+        Type? derivedType,
+        MetadataBinder binder,
+        ComponentConfigurationAttribute[] configurations,
+        Dictionary<string, object?> result)
+    {
+        var sourceType = configurations
+            .OfType<DropdownAttribute>()
+            .SingleOrDefault()?.Source;
+        
+        // Get the T in DropdownValue<T>
+        var innerType = type.GenericTypeArguments[0];
+        result["Subtype"] = Nullable.GetUnderlyingType(innerType)?.Name ?? innerType.Name;
+        
+        if (sourceType == null)
+        {
+            // No explicit source - check if T is an enum
+            var enumType = type.GenericTypeArguments[0].GetEnumType();
+            
+            if (enumType != null)
+            {
+                // Generate dropdown items from enum values
+                var items = Enum.GetValues(enumType)
+                    .Cast<object>()
+                    .Select(t => new DropdownItem(
+                        label: t.ToString().Humanize(LetterCasing.Sentence),
+                        value: t.ToString()))
+                    .ToList();
+                
+                result["Items"] = items;
+                result["Source"] = enumType.FullName;
+                return;
+            }
+        }
+        else
+        {
+            // Check if source is an inline source
+            var inlineSource = sourceType
+                .GetInterfaces(typeof(IDropdownInlineSource))
+                .SingleOrDefault();
+            
+            if (inlineSource != null)
+            {
+                // Get items from inline source using DI
+                var source = binder.Container.GetService(sourceType);
+                var items = sourceType.GetTypeInfo()
+                    .GetMethod(nameof(IDropdownInlineSource.GetItems))
+                    .Invoke(source, null);
+                
+                result["Items"] = items;
+                result["Source"] = sourceType.FullName;
+                return;
+            }
+            
+            // Check if source is a remote source (typeahead)
+            if (sourceType.GetInterfaces(typeof(ITypeaheadRemoteSource)).Any())
+            {
+                result["Source"] = sourceType.GetFormId();
+                return;
+            }
+        }
+        
+        throw new BindingException("Field defines an invalid dropdown source.");
+    }
+}
+```
+
+This factory:
+1. Extends `DefaultMetadataFactory` to leverage existing functionality
+2. Overrides `AugmentConfiguration` to add custom logic
+3. Determines the dropdown's data source (enum, inline, or remote)
+4. Generates appropriate metadata for each source type
+5. Uses the DI container to instantiate inline sources
+
+## Field Metadata Factories
+
+For customizing how individual fields are processed, implement `IFieldMetadataFactory` (source:UiMetadataFramework.Core/Binding/Field/IFieldMetadataFactory.cs:8):
+
+```csharp
+public interface IFieldMetadataFactory
+{
+    FieldMetadata GetMetadata(
+        FieldAttribute? attribute,      // Field attribute (InputField/OutputField)
+        PropertyInfo property,           // The property being processed
+        ComponentBinding binding,        // Component binding for the field's type
+        MetadataBinder binder           // Metadata binder instance
+    );
+}
+```
+
+### DefaultFieldMetadataFactory
+
+The default implementation (source:UiMetadataFramework.Core/Binding/Field/DefaultFieldMetadataFactory.cs:7):
+
+```csharp
+public class DefaultFieldMetadataFactory : IFieldMetadataFactory
+{
+    public virtual FieldMetadata GetMetadata(
+        FieldAttribute? attribute,
+        PropertyInfo property,
+        ComponentBinding binding,
+        MetadataBinder binder)
+    {
+        // Validate event handler attributes
+        var eventHandlerAttributes = property
+            .GetCustomAttributesImplementingInterface<IFieldEventHandlerAttribute>()
+            .ToList();
+            
+        var illegalAttributes = eventHandlerAttributes
+            .Where(t => !t.ApplicableToFieldCategory(binding.Category))
+            .ToList();
+            
+        if (illegalAttributes.Any())
+        {
+            throw new BindingException(
+                $"Field '{property.DeclaringType.FullName}.{property.Name}' cannot use " +
+                $"'{illegalAttributes[0].GetType().FullName}', because the attribute is not " +
+                $"applicable for this field category.");
+        }
+        
+        // Build component metadata
+        var component = binder.GetFieldCollection(binding.Category).BuildComponent(property);
+        
+        return new FieldMetadata(component)
+        {
+            Id = property.Name,
+            Hidden = attribute?.Hidden ?? false,
+            Label = attribute?.Label ?? property.Name,
+            OrderIndex = attribute?.OrderIndex ?? 0,
+            CustomProperties = property.GetCustomProperties(binder),
+            EventHandlers = eventHandlerAttributes
+                .Select(t => t.ToMetadata(property, binder))
+                .ToList()
+        };
+    }
+}
+```
+
+## When to Use Custom Factories
+
+### Use DefaultMetadataFactory when:
+- Configuration is simple key-value pairs
+- No data transformation is needed
+- Standard validation is sufficient
+
+### Create a custom factory when:
+- You need to compute metadata from multiple sources
+- Configuration requires transformation (e.g., enum to dropdown items)
+- You need to validate complex business rules
+- You want to integrate with external services via DI
+- You need to generate metadata dynamically based on types
+
+### Override AugmentConfiguration when:
+- You want default behavior plus custom additions
+- You need to modify the result dictionary
+- You want to add computed properties
+
+### Implement IMetadataFactory from scratch when:
+- You need completely different metadata structure
+- Default behavior doesn't fit your use case
+- You want full control over the metadata generation
+
+## Best Practices
+
+1. **Extend DefaultMetadataFactory**: Start with the default and override `AugmentConfiguration` rather than implementing `IMetadataFactory` from scratch
+2. **Use the DI container**: Access services through `binder.Container.GetService()` for testability
+3. **Validate early**: Throw `BindingException` with clear messages when configuration is invalid
+4. **Keep it pure**: Avoid side effects in metadata generation
+5. **Cache expensive operations**: Use static caches for reflection-heavy operations
+6. **Document metadata structure**: Clearly document what metadata your factory produces for frontend developers
+
+## Next Steps
+
+- Learn about [dependency injection](/advanced/dependency-injection) in UIMF
+- See how to [create custom components](/advanced/custom-components)
+- Understand [client integration](/advanced/client-integration) to consume the metadata

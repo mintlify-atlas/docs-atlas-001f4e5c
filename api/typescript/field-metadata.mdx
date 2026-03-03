@@ -1,0 +1,307 @@
+---
+title: Field Metadata Classes
+description: TypeScript classes for input and output field metadata
+---
+
+## Overview
+
+UIMF provides two classes for field metadata:
+
+- `InputFieldMetadata` - Represents metadata for input fields (form controls)
+- `OutputFieldMetadata` - Represents metadata for output fields (display controls)
+
+Both classes share similar structures but serve different purposes in the form lifecycle.
+
+## InputFieldMetadata
+
+### Class Signature
+
+```typescript
+export class InputFieldMetadata {
+  constructor(metadata: any)
+}
+```
+
+### Properties
+
+<ParamField path="id" type="string">
+  Unique identifier of the input field.
+</ParamField>
+
+<ParamField path="label" type="string">
+  Human-readable label for the input field, typically displayed next to the control.
+</ParamField>
+
+<ParamField path="type" type="string">
+  Name of the client control that will render this input field (e.g., 'text', 'number', 'dropdown').
+</ParamField>
+
+<ParamField path="required" type="boolean">
+  Indicates whether a value for this input field is required before submitting the form.
+</ParamField>
+
+<ParamField path="hidden" type="boolean">
+  Indicates whether this field should be visible or hidden in the UI.
+</ParamField>
+
+<ParamField path="orderIndex" type="number">
+  Determines the rendering position of this field relative to other fields in the form.
+</ParamField>
+
+<ParamField path="customProperties" type="any">
+  Additional parameters for the client control, used to pass control-specific configuration.
+</ParamField>
+
+<ParamField path="eventHandlers" type="EventHandlerMetadata[]">
+  Array of event handlers attached to this input field.
+</ParamField>
+
+### Methods
+
+#### getCustomProperty
+
+Retrieves the value of a custom property by name.
+
+```typescript
+getCustomProperty(name: string): any
+```
+
+**Parameters:**
+- `name` - The name of the custom property to retrieve
+
+**Returns:** The value of the custom property, or `null` if the property is undefined.
+
+### Usage Example
+
+```typescript
+import { InputFieldMetadata } from 'uimf-core';
+
+const fieldJson = {
+  id: 'email',
+  label: 'Email Address',
+  type: 'text',
+  required: true,
+  hidden: false,
+  orderIndex: 1,
+  customProperties: {
+    placeholder: 'Enter your email',
+    maxLength: 100,
+    pattern: '^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$'
+  }
+};
+
+const field = new InputFieldMetadata(fieldJson);
+
+console.log(field.label); // 'Email Address'
+console.log(field.required); // true
+
+const placeholder = field.getCustomProperty('placeholder'); // 'Enter your email'
+const maxLength = field.getCustomProperty('maxLength'); // 100
+```
+
+## OutputFieldMetadata
+
+### Class Signature
+
+```typescript
+export class OutputFieldMetadata {
+  constructor(metadata: any)
+}
+```
+
+### Properties
+
+<ParamField path="id" type="string">
+  Unique identifier of the output field.
+</ParamField>
+
+<ParamField path="label" type="string">
+  Human-readable label for the output field.
+</ParamField>
+
+<ParamField path="type" type="string">
+  Name of the client control that will render this output field (e.g., 'text', 'table', 'chart').
+</ParamField>
+
+<ParamField path="hidden" type="boolean">
+  Indicates whether this field should be visible or hidden in the UI.
+</ParamField>
+
+<ParamField path="orderIndex" type="number">
+  Determines the rendering position of this field relative to other fields in the form response.
+</ParamField>
+
+<ParamField path="customProperties" type="any">
+  Additional parameters for the client control. For paginated data controls, this includes a special `columns` property that contains nested `OutputFieldMetadata` instances.
+</ParamField>
+
+<ParamField path="eventHandlers" type="EventHandlerMetadata[]">
+  Array of event handlers attached to this output field.
+</ParamField>
+
+### Methods
+
+#### getCustomProperty
+
+Retrieves the value of a custom property by name.
+
+```typescript
+getCustomProperty(name: string): any
+```
+
+**Parameters:**
+- `name` - The name of the custom property to retrieve
+
+**Returns:** The value of the custom property, or `null` if the property is undefined.
+
+### Usage Example
+
+```typescript
+import { OutputFieldMetadata } from 'uimf-core';
+
+const fieldJson = {
+  id: 'results',
+  label: 'Search Results',
+  type: 'paginated-data',
+  hidden: false,
+  orderIndex: 1,
+  customProperties: {
+    pageSize: 10,
+    columns: {
+      name: {
+        id: 'name',
+        label: 'Name',
+        type: 'text'
+      },
+      email: {
+        id: 'email',
+        label: 'Email',
+        type: 'text'
+      }
+    }
+  }
+};
+
+const field = new OutputFieldMetadata(fieldJson);
+
+console.log(field.label); // 'Search Results'
+
+const pageSize = field.getCustomProperty('pageSize'); // 10
+const columns = field.getCustomProperty('columns');
+
+// Columns are automatically converted to OutputFieldMetadata instances
+console.log(columns.name instanceof OutputFieldMetadata); // true
+console.log(columns.name.label); // 'Name'
+```
+
+## How Clients Use These Classes
+
+Clients use field metadata classes to dynamically render form controls:
+
+### Rendering Input Fields
+
+```typescript
+class InputRenderer {
+  renderField(field: InputFieldMetadata): HTMLElement {
+    // Skip hidden fields
+    if (field.hidden) {
+      return null;
+    }
+    
+    const container = document.createElement('div');
+    
+    // Create label
+    const label = document.createElement('label');
+    label.textContent = field.label;
+    if (field.required) {
+      label.textContent += ' *';
+    }
+    container.appendChild(label);
+    
+    // Create control based on type
+    const control = this.createControl(field.type, field.customProperties);
+    control.id = field.id;
+    container.appendChild(control);
+    
+    return container;
+  }
+  
+  createControl(type: string, customProperties: any): HTMLElement {
+    // Use customProperties to configure the control
+    switch(type) {
+      case 'text':
+        const input = document.createElement('input');
+        input.type = 'text';
+        if (customProperties?.placeholder) {
+          input.placeholder = customProperties.placeholder;
+        }
+        if (customProperties?.maxLength) {
+          input.maxLength = customProperties.maxLength;
+        }
+        return input;
+      // ... other control types
+    }
+  }
+}
+```
+
+### Rendering Output Fields
+
+```typescript
+class OutputRenderer {
+  renderField(field: OutputFieldMetadata, value: any): HTMLElement {
+    if (field.hidden) {
+      return null;
+    }
+    
+    const container = document.createElement('div');
+    
+    // Create label
+    const label = document.createElement('h3');
+    label.textContent = field.label;
+    container.appendChild(label);
+    
+    // Create output control based on type
+    const control = this.createOutputControl(field.type, value, field.customProperties);
+    container.appendChild(control);
+    
+    return container;
+  }
+  
+  createOutputControl(type: string, value: any, customProperties: any): HTMLElement {
+    switch(type) {
+      case 'text':
+        const p = document.createElement('p');
+        p.textContent = value;
+        return p;
+      case 'paginated-data':
+        return this.createTable(value, customProperties.columns);
+      // ... other control types
+    }
+  }
+}
+```
+
+## Special Handling for Paginated Data
+
+`OutputFieldMetadata` includes special logic in its constructor to handle paginated data controls. When the `customProperties.columns` property exists, each column definition is automatically converted from a plain object to an `OutputFieldMetadata` instance:
+
+```typescript
+const tableField = new OutputFieldMetadata({
+  type: 'paginated-data',
+  customProperties: {
+    columns: {
+      // These plain objects are converted to OutputFieldMetadata instances
+      name: { id: 'name', label: 'Name', type: 'text' },
+      age: { id: 'age', label: 'Age', type: 'number' }
+    }
+  }
+});
+
+// Access column metadata as OutputFieldMetadata instances
+const nameColumn = tableField.customProperties.columns.name;
+console.log(nameColumn instanceof OutputFieldMetadata); // true
+console.log(nameColumn.label); // 'Name'
+```
+
+This allows table renderers to use the same metadata structure for both the table itself and its columns.

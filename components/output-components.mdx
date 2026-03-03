@@ -1,0 +1,615 @@
+---
+title: Output Components
+description: Complete reference of all output components in UI Metadata Framework
+---
+
+Output components are used to display data to users in form responses. The framework provides various output types optimized for different data presentation scenarios.
+
+## Component Overview
+
+All output components are defined in the `UiMetadataFramework.Basic.Output` namespace. Each component has a corresponding C# type that you use in your form response classes.
+
+<Accordion title="Text">
+
+### Purpose
+Displays text and boolean values as read-only output.
+
+### C# Types
+Supports:
+- `string`
+- `bool`
+
+### Component Type
+`text`
+
+### Usage Example
+```csharp
+public class MyFormResponse : FormResponse
+{
+    [OutputField(Label = "User name")]
+    public string UserName { get; set; }
+    
+    [OutputField(Label = "Is active")]
+    public bool IsActive { get; set; }
+}
+```
+
+### Implementation
+Defined in `StringOutputComponentBinding.cs`:
+- Server types: `string`, `bool`
+- Component type: `"text"`
+- Category: Output
+
+</Accordion>
+
+<Accordion title="Number">
+
+### Purpose
+Displays numeric values as read-only output.
+
+### C# Types
+Supports multiple numeric types:
+- `int`
+- `decimal`
+- `double`
+- `short`
+- `long`
+- `byte`
+
+### Component Type
+`number`
+
+### Usage Example
+```csharp
+public class MyFormResponse : FormResponse
+{
+    [OutputField(Label = "Total items")]
+    public int TotalItems { get; set; }
+    
+    [OutputField(Label = "Total price")]
+    public decimal TotalPrice { get; set; }
+}
+```
+
+### Implementation
+Defined in `NumberOutputComponentBinding.cs`:
+- Server types: `int`, `decimal`, `double`, `short`, `long`, `byte`
+- Component type: `"number"`
+- Category: Output
+
+</Accordion>
+
+<Accordion title="DateTime">
+
+### Purpose
+Displays date and time values as read-only output.
+
+### C# Type
+```csharp
+DateTime
+```
+
+### Component Type
+`datetime`
+
+### Usage Example
+```csharp
+using System;
+
+public class MyFormResponse : FormResponse
+{
+    [OutputField(Label = "Created at")]
+    public DateTime CreatedAt { get; set; }
+    
+    [OutputField(Label = "Last modified")]
+    public DateTime? LastModified { get; set; }
+}
+```
+
+### Implementation
+Defined in `DateTimeOutputComponentBinding.cs`:
+- Server type: `typeof(DateTime)`
+- Component type: `"datetime"`
+- Category: Output
+
+</Accordion>
+
+<Accordion title="ActionList">
+
+### Purpose
+Displays a list of actions (links to forms) that the user can perform.
+
+### C# Type
+```csharp
+ActionList
+```
+
+### Component Type
+`action-list`
+
+### Usage Example
+```csharp
+using UiMetadataFramework.Basic.Output.ActionList;
+using UiMetadataFramework.Basic.Output.FormLink;
+
+public class MyFormResponse : FormResponse
+{
+    [OutputField(Label = "Available actions")]
+    public ActionList Actions { get; set; }
+}
+
+// In your form handler:
+public MyFormResponse Handle(MyFormRequest request)
+{
+    return new MyFormResponse
+    {
+        Actions = new ActionList(
+            new FormLink
+            {
+                Form = "edit-user",
+                Label = "Edit",
+                InputFieldValues = new Dictionary<string, object> { { "userId", request.UserId } }
+            },
+            new FormLink
+            {
+                Form = "delete-user",
+                Label = "Delete",
+                Action = FormLinkActions.Run,
+                InputFieldValues = new Dictionary<string, object> { { "userId", request.UserId } }
+            }
+        )
+    };
+}
+```
+
+### Properties
+
+- `Actions` (IList&lt;FormLink&gt;): List of form links
+
+### Constructor
+```csharp
+public ActionList(params FormLink[] actions)
+```
+
+### Implementation
+Defined in `ActionList.cs`:
+```csharp
+[MyOutputComponent("action-list")]
+public class ActionList
+{
+    public IList<FormLink> Actions { get; set; }
+}
+```
+
+### See Also
+- [FormLink](#formlink) - Individual action configuration
+- [FormLinkActions](#formlink) - Available action types
+
+</Accordion>
+
+<Accordion title="Table">
+
+### Purpose
+Displays collections of data as a table with automatic column generation.
+
+### C# Types
+Supports:
+- `IEnumerable<T>`
+- `IList<T>`
+- `Array`
+
+### Component Type
+`table`
+
+### Usage Example
+```csharp
+using System.Collections.Generic;
+
+public class User
+{
+    [OutputField(Label = "ID")]
+    public int Id { get; set; }
+    
+    [OutputField(Label = "Name")]
+    public string Name { get; set; }
+    
+    [OutputField(Label = "Email")]
+    public string Email { get; set; }
+    
+    [OutputField(Label = "Status")]
+    public bool IsActive { get; set; }
+}
+
+public class MyFormResponse : FormResponse
+{
+    [OutputField(Label = "Users")]
+    public IEnumerable<User> Users { get; set; }
+}
+```
+
+### Table Configuration
+
+The table automatically generates columns based on the properties of the item type. Properties decorated with `[OutputField]` become table columns.
+
+**Column Generation:**
+- Uses `OutputField` attributes from the item class
+- Supports nested output components
+- Automatically determines appropriate component for each property type
+
+### Implementation
+Defined in `TableOutputComponentBinding.cs`:
+```csharp
+public class TableOutputComponentBinding : ComponentBinding
+{
+    public TableOutputComponentBinding() : base(
+        MetadataBinder.ComponentCategories.Output,
+        [
+            typeof(IEnumerable<>),
+            typeof(IList<>),
+            typeof(Array)
+        ],
+        "table",
+        typeof(TableMetadataFactory))
+    {
+        this.AdditionalData = new Dictionary<string, object?> 
+        { 
+            { nameof(MyOutputComponentAttribute.NoLabelByDefault), true } 
+        };
+    }
+}
+```
+
+### TableMetadataFactory
+
+The factory automatically extracts column metadata from the item type:
+
+```csharp
+public class TableMetadataFactory : DefaultMetadataFactory
+{
+    protected override void AugmentConfiguration(
+        Type type,
+        Type? derivedType,
+        MetadataBinder binder,
+        ComponentConfigurationAttribute[] configurations,
+        Dictionary<string, object?> result)
+    {
+        var innerType = type.IsArray
+            ? type.GetElementType()
+            : type.GenericTypeArguments[0];
+
+        result["Columns"] = binder.Outputs.GetFields(innerType).ToList();
+    }
+}
+```
+
+### Notes
+- Tables have no label by default
+- Columns are automatically configured from the item type's output fields
+- Supports custom output components within table cells
+
+</Accordion>
+
+<Accordion title="PaginatedData">
+
+### Purpose
+Displays large datasets with pagination, sorting, and navigation controls.
+
+### C# Type
+```csharp
+PaginatedData<T>
+```
+
+### Component Type
+`paginated-data`
+
+### Usage Example
+```csharp
+using UiMetadataFramework.Basic.Inputs.Paginator;
+using UiMetadataFramework.Basic.Output.PaginatedData;
+
+public class ListUsersRequest
+{
+    [InputField(Hidden = true)]
+    public Paginator Paginator { get; set; }
+}
+
+public class ListUsersResponse : FormResponse
+{
+    [OutputField]
+    [PaginatedData(nameof(ListUsersRequest.Paginator))]
+    public PaginatedData<User> Users { get; set; }
+}
+
+// In your form handler:
+public ListUsersResponse Handle(ListUsersRequest request)
+{
+    var paginator = request.Paginator ?? new Paginator();
+    var pageSize = paginator.PageSize ?? 10;
+    var pageIndex = paginator.PageIndex ?? 0;
+    
+    var query = dbContext.Users.AsQueryable();
+    
+    // Apply sorting
+    if (!string.IsNullOrEmpty(paginator.OrderBy))
+    {
+        query = paginator.Ascending == true
+            ? query.OrderBy(paginator.OrderBy)
+            : query.OrderByDescending(paginator.OrderBy);
+    }
+    
+    var totalCount = query.Count();
+    var items = query.Skip(pageIndex * pageSize).Take(pageSize).ToList();
+    
+    return new ListUsersResponse
+    {
+        Users = new PaginatedData<User>
+        {
+            Results = items,
+            TotalCount = totalCount
+        }
+    };
+}
+```
+
+### Properties
+
+- `Results` (IEnumerable&lt;T&gt;?): Items for the current page
+- `TotalCount` (int): Total number of items across all pages
+
+### PaginatedDataAttribute
+
+Configures which paginator controls this paginated data.
+
+```csharp
+public class PaginatedDataAttribute : ComponentConfigurationAttribute
+{
+    public string Paginator { get; }
+}
+```
+
+**Parameters:**
+- `paginator`: Name of the input field of type `Paginator` that controls pagination
+
+**Usage:**
+```csharp
+[PaginatedData(nameof(MyFormRequest.Paginator))]
+public PaginatedData<User> Users { get; set; }
+```
+
+### Paginator
+
+The companion input component that controls pagination. See [Paginator](/components/input-components#paginator) in Input Components.
+
+**Properties:**
+- `PageIndex` (int?): Current page number (0-based)
+- `PageSize` (int?): Number of items per page
+- `OrderBy` (string?): Property name to sort by
+- `Ascending` (bool?): Sort direction
+
+### Implementation
+Defined in `PaginatedData.cs`:
+```csharp
+[MyOutputComponent("paginated-data", typeof(PaginatedDataMetadataFactory), NoLabelByDefault = true)]
+[HasConfiguration(typeof(PaginatedDataAttribute), mandatory: true)]
+public class PaginatedData<T>
+{
+    public IEnumerable<T>? Results { get; set; }
+    public int TotalCount { get; set; }
+}
+```
+
+### Notes
+- No label by default
+- Automatically handles pagination UI on the client
+- Works in conjunction with `Paginator` input component
+- Supports sorting by any property of the item type
+
+</Accordion>
+
+<Accordion title="FormLink">
+
+### Purpose
+Creates a link to another form, optionally passing input values and controlling how the form is opened.
+
+### C# Type
+```csharp
+FormLink
+```
+
+### Component Type
+`formlink`
+
+### Usage Example
+```csharp
+using UiMetadataFramework.Basic.Output.FormLink;
+
+public class MyFormResponse : FormResponse
+{
+    [OutputField(Label = "Edit user")]
+    public FormLink EditUserLink { get; set; }
+}
+
+// In your form handler:
+public MyFormResponse Handle(MyFormRequest request)
+{
+    return new MyFormResponse
+    {
+        EditUserLink = new FormLink
+        {
+            Form = "edit-user",
+            Label = "Edit User",
+            Action = FormLinkActions.OpenModal,
+            InputFieldValues = new Dictionary<string, object?>
+            {
+                { "userId", request.UserId }
+            }
+        }
+    };
+}
+```
+
+### Properties
+
+- `Form` (string): Name of the form to link to (required)
+- `Label` (string?): Display text for the link
+- `Action` (string?): How to open the form (see FormLinkActions below)
+- `InputFieldValues` (IDictionary&lt;string, object?&gt;?): Pre-populate input fields
+
+### FormLinkActions
+
+Defines how the linked form should be opened when the user clicks the link.
+
+```csharp
+public static class FormLinkActions
+{
+    // Run form immediately without user interaction
+    public const string Run = "run";
+    
+    // Open form in a modal for review before running
+    public const string OpenModal = "open-modal";
+    
+    // Navigate to the form (regular link behavior)
+    public const string Redirect = "redirect";
+}
+```
+
+**Action Details:**
+
+**`Run`** - Executes the form immediately:
+```csharp
+new FormLink
+{
+    Form = "delete-user",
+    Label = "Delete",
+    Action = FormLinkActions.Run,
+    InputFieldValues = new Dictionary<string, object?> { { "userId", userId } }
+}
+```
+- Form runs immediately on click
+- User cannot modify input values
+- Useful for action buttons
+
+**`OpenModal`** - Opens form in a modal dialog:
+```csharp
+new FormLink
+{
+    Form = "edit-user",
+    Label = "Edit",
+    Action = FormLinkActions.OpenModal,
+    InputFieldValues = new Dictionary<string, object?> { { "userId", userId } }
+}
+```
+- Opens form in a modal window
+- User can review and modify inputs before submitting
+- Default behavior if Action is not specified
+
+**`Redirect`** - Navigates to the form:
+```csharp
+new FormLink
+{
+    Form = "user-details",
+    Label = "View Details",
+    Action = FormLinkActions.Redirect,
+    InputFieldValues = new Dictionary<string, object?> { { "userId", userId } }
+}
+```
+- Behaves like a regular navigation link
+- Leaves current page and goes to the linked form
+
+### Implementation
+Defined in `FormLink.cs`:
+```csharp
+[MyOutputComponent("formlink")]
+public class FormLink
+{
+    public string? Action { get; set; }
+    public string Form { get; set; } = null!;
+    public IDictionary<string, object?>? InputFieldValues { get; set; }
+    public string? Label { get; set; }
+}
+```
+
+</Accordion>
+
+<Accordion title="InlineForm">
+
+### Purpose
+Embeds another form directly within the current form's response. Useful for composing complex UIs.
+
+### C# Type
+```csharp
+InlineForm
+```
+
+### Component Type
+`inline-form`
+
+### Usage Example
+```csharp
+using UiMetadataFramework.Basic.Output.InlineForm;
+
+public class DashboardResponse : FormResponse
+{
+    [OutputField(Label = "Quick search")]
+    public InlineForm SearchForm { get; set; }
+    
+    [OutputField(Label = "Recent activity")]
+    public InlineForm ActivityForm { get; set; }
+}
+
+// In your form handler:
+public DashboardResponse Handle(DashboardRequest request)
+{
+    return new DashboardResponse
+    {
+        SearchForm = new InlineForm
+        {
+            Form = "search-users",
+            InputFieldValues = new Dictionary<string, object?>
+            {
+                { "departmentId", request.DepartmentId }
+            }
+        },
+        ActivityForm = new InlineForm
+        {
+            Form = "recent-activity"
+        }
+    };
+}
+```
+
+### Properties
+
+- `Form` (string): Name of the form to render inline (required)
+- `InputFieldValues` (IDictionary&lt;string, object?&gt;?): Pre-populate input fields of the embedded form
+
+### Implementation
+Defined in `InlineForm.cs`:
+```csharp
+[MyOutputComponent("inline-form")]
+public class InlineForm
+{
+    public string Form { get; set; } = null!;
+    public IDictionary<string, object?>? InputFieldValues { get; set; }
+}
+```
+
+### Use Cases
+
+- **Dashboards**: Compose multiple forms into a single view
+- **Wizards**: Embed sub-forms within a larger workflow
+- **Contextual Actions**: Show related forms based on current data
+
+### Notes
+
+- The embedded form is fully functional and can be submitted independently
+- Input values can be pre-populated from the parent form's context
+- The embedded form maintains its own metadata and validation rules
+
+</Accordion>
+
+## See Also
+
+- [Input Components](/components/input-components) - Learn about input components
+- [Output Attributes](/attributes/output-attributes) - Configure output behavior with attributes
+- [Forms](/core-concepts/forms) - Understanding forms in UI Metadata Framework

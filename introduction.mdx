@@ -1,0 +1,173 @@
+---
+title: Introduction
+description: Build dynamic user interfaces from server-side metadata
+---
+
+## What is UI Metadata Framework?
+
+UI Metadata Framework (UIMF) is a client-server communication protocol that enables you to generate dynamic user interfaces from backend metadata. Instead of manually creating frontend forms for every API endpoint, UIMF uses .NET reflection to automatically generate metadata describing your forms, which frontend clients can use to dynamically render the UI.
+
+<CardGroup cols={3}>
+  <Card title="Quickstart" icon="rocket" href="/quickstart">
+    Build your first form in under 5 minutes
+  </Card>
+  <Card title="Core concepts" icon="book" href="/concepts/overview">
+    Learn the fundamental concepts of UIMF
+  </Card>
+  <Card title="API reference" icon="code" href="/api/core/form-attribute">
+    Explore the complete API documentation
+  </Card>
+</CardGroup>
+
+## The problem UIMF solves
+
+Traditional full-stack development requires you to:
+
+1. Define your API endpoint on the backend
+2. Manually create a corresponding form component on the frontend
+3. Keep both in sync as requirements change
+4. Repeat for every single endpoint
+
+This approach is time-consuming, error-prone, and makes it difficult to maintain consistency across your application.
+
+## How UIMF works
+
+With UIMF, you define your forms once on the backend using attributes, and the framework automatically generates metadata that describes:
+
+- Input fields and their types
+- Output fields and their formatting
+- Validation rules
+- Labels and descriptions
+- Custom properties
+
+Your frontend can then consume this metadata to dynamically generate the appropriate UI.
+
+<Note>
+UIFM uses a protocol-based approach, meaning you can implement the frontend in any framework. The official [uimf-svelte](https://github.com/unops/uimf-svelte) client demonstrates this with Svelte.
+</Note>
+
+## Example
+
+Here's a simple form that adds two numbers:
+
+```csharp
+[Form(Label = "Add 2 numbers", SubmitButtonLabel = "Submit", PostOnLoad = false)]
+public class AddNumbers : Form<AddNumbers.Request, AddNumbers.Response>
+{
+    public class Response : FormResponse
+    {
+        [OutputField(Label = "Result of your calculation")]
+        public long Result { get; set; }
+    }
+
+    public class Request : IRequest<Response>
+    {
+        [InputField(Label = "First number")]
+        public int Number1 { get; set; }
+
+        [InputField(Label = "Second number")]
+        public int Number2 { get; set; }
+    }
+
+    protected override Response Handle(Request message)
+    {
+        return new Response
+        {
+            Result = message.Number1 + message.Number2
+        };
+    }
+}
+```
+
+UIFM automatically generates metadata describing this form:
+
+```json
+{
+    "id": "UiMetadataFramework.Web.Forms.AddNumbers",
+    "label": "Add 2 numbers",
+    "inputFields": [
+        {
+            "id": "Number1",
+            "label": "First number",
+            "type": "number",
+            "required": true,
+            "orderIndex": 0
+        },
+        {
+            "id": "Number2",
+            "label": "Second number",
+            "type": "number",
+            "required": true,
+            "orderIndex": 0
+        }
+    ],
+    "outputFields": [
+        {
+            "id": "Result",
+            "label": "Result of your calculation",
+            "type": "number",
+            "orderIndex": 0
+        }
+    ],
+    "postOnLoad": false
+}
+```
+
+Your frontend client receives this metadata and renders the appropriate form with input fields, labels, and output display.
+
+## Key features
+
+<CardGroup cols={2}>
+  <Card title="Automatic metadata generation" icon="wand-magic-sparkles">
+    Use .NET reflection to generate form metadata from your C# classes automatically
+  </Card>
+  <Card title="Type-safe forms" icon="shield-check">
+    Leverage C# type system for compile-time validation of your form definitions
+  </Card>
+  <Card title="Extensible components" icon="puzzle-piece">
+    Create custom input and output components with their own metadata
+  </Card>
+  <Card title="Framework agnostic" icon="layer-group">
+    The protocol works with any frontend framework that can consume JSON metadata
+  </Card>
+  <Card title="Built-in validation" icon="check-circle">
+    Define validation rules using attributes that are enforced on the client
+  </Card>
+  <Card title="Dynamic behavior" icon="bolt">
+    Support for event handlers, custom properties, and conditional field visibility
+  </Card>
+</CardGroup>
+
+## Architecture
+
+UIFM consists of two main packages:
+
+- **UiMetadataFramework.Core** - Core concepts and building blocks for creating your own UIMF backend
+- **UiMetadataFramework.Basic** - Example component library with common input/output components
+
+<Tip>
+You can use `UiMetadataFramework.Core` to build your own custom component library tailored to your specific needs, or use `UiMetadataFramework.Basic` as a starting point.
+</Tip>
+
+## Frontend implementations
+
+While UIMF is framework-agnostic, here are the official frontend implementations:
+
+- [uimf-svelte](https://github.com/unops/uimf-svelte) - Web client built with Svelte
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="Get started" icon="play" href="/quickstart">
+    Follow the quickstart to build your first form
+  </Card>
+  <Card title="Installation" icon="download" href="/installation">
+    Install UIMF packages in your project
+  </Card>
+  <Card title="Learn core concepts" icon="graduation-cap" href="/concepts/overview">
+    Understand forms, fields, and metadata binding
+  </Card>
+  <Card title="View examples" icon="code" href="/guides/creating-forms">
+    Explore detailed guides and examples
+  </Card>
+</CardGroup>

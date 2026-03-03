@@ -1,0 +1,450 @@
+---
+title: "Output Fields"
+description: "Understanding output fields and the OutputFieldAttribute"
+---
+
+## What are Output Fields?
+
+Output fields represent data returned from the server to the client. They are properties on the response class decorated with `OutputFieldAttribute`. The framework generates metadata that tells the client how to render the response data.
+
+## OutputFieldAttribute
+
+The `OutputFieldAttribute` decorates properties to mark them as output fields:
+
+```csharp /home/daytona/workspace/source/UiMetadataFramework.Core/Binding/Field/OutputFieldAttribute.cs
+public class OutputFieldAttribute : FieldAttribute
+{
+    public OutputFieldAttribute() : base(MetadataBinder.ComponentCategories.Output)
+    {
+    }
+}
+```
+
+Notice that unlike `InputFieldAttribute`, there's no `Required` property. Output fields simply display what the server returns.
+
+### Inherited Properties from FieldAttribute
+
+`OutputFieldAttribute` inherits all properties from `FieldAttribute`:
+
+```csharp /home/daytona/workspace/source/UiMetadataFramework.Core/Binding/Field/FieldAttribute.cs:23-37
+public abstract class FieldAttribute : Attribute
+{
+    public bool Hidden { get; set; }
+    public string? Label { get; set; }
+    public int OrderIndex { get; set; }
+}
+```
+
+## Field Properties
+
+### Label
+
+Human-readable label displayed next to the output value:
+
+```csharp
+public class Response : FormResponse
+{
+    [OutputField(Label = "User ID")]
+    public int UserId { get; set; }
+
+    [OutputField(Label = "Registration Date")]
+    public DateTime RegisteredAt { get; set; }
+}
+```
+
+If not specified, the property name is used as the label.
+
+### OrderIndex
+
+Controls the rendering order. Lower values appear first:
+
+```csharp
+public class Response : FormResponse
+{
+    [OutputField(Label = "First name", OrderIndex = 1)]
+    public string? FirstName { get; set; }
+
+    [OutputField(Label = "Last name", OrderIndex = 2)]
+    public string? LastName { get; set; }
+
+    [OutputField(Label = "Email", OrderIndex = 3)]
+    public string? Email { get; set; }
+}
+```
+
+<Tip>
+Use the same `OrderIndex` values in both request and response classes to maintain consistent field ordering.
+</Tip>
+
+### Hidden
+
+Hides the field from display. Useful for returning data that clients need but shouldn't show to users:
+
+```csharp
+public class Response : FormResponse
+{
+    [OutputField(Label = "Username")]
+    public string? Username { get; set; }
+
+    [OutputField(Hidden = true)]
+    public string? InternalToken { get; set; }  // Client needs it, but user doesn't see it
+}
+```
+
+## Type-to-Component Mapping
+
+Just like input fields, output fields are mapped to UI components based on their C# type:
+
+### Built-in Mappings
+
+```csharp
+// String/Boolean → Text display
+[OutputField(Label = "Name")]
+public string? Name { get; set; }
+
+[OutputField(Label = "Active")]
+public bool IsActive { get; set; }
+
+// DateTime → Formatted date display
+[OutputField(Label = "Created")]
+public DateTime CreatedAt { get; set; }
+
+// Decimal/Double → Formatted number
+[OutputField(Label = "Price")]
+public decimal Price { get; set; }
+
+// Int → Number display
+[OutputField(Label = "Count")]
+public int Count { get; set; }
+```
+
+### String/Boolean Output Example
+
+From the source code:
+
+```csharp /home/daytona/workspace/source/UiMetadataFramework.Basic/Output/Text/StringOutputComponentBinding.cs
+public class StringOutputComponentBinding : ComponentBinding
+{
+    internal const string ControlName = "text";
+
+    public StringOutputComponentBinding() : base(
+        MetadataBinder.ComponentCategories.Output,
+        serverTypes:
+        [
+            typeof(string),
+            typeof(bool)
+        ],
+        componentType: "text",
+        metadataFactory: null)
+    {
+    }
+}
+```
+
+This binding maps both `string` and `bool` types to a text output component.
+
+<Info>
+A single component can handle multiple server types. The client decides how to format each type.
+</Info>
+
+## Real-World Example
+
+From the test suite:
+
+```csharp /home/daytona/workspace/source/UiMetadataFramework.Tests/MediatrTests.cs:54-67
+public class Response : FormResponse<FormResponseMetadata>
+{
+    [OutputField(Label = "First name", OrderIndex = 1)]
+    public string? FirstName { get; set; }
+
+    [OutputField(Label = "DoB", OrderIndex = 2)]
+    public DateTime? DateOfBirth { get; set; }
+
+    [OutputField(Hidden = true)]
+    public int Height { get; set; }
+
+    [OutputField(Hidden = true)]
+    public decimal Weight { get; set; }
+}
+```
+
+This generates metadata with:
+- 2 visible output fields (FirstName, DateOfBirth)
+- 2 hidden output fields (Height, Weight)
+
+## FormResponse and Response Metadata
+
+All response classes inherit from `FormResponse`:
+
+```csharp
+public class Response : FormResponse
+{
+    [OutputField(Label = "Message")]
+    public string? Message { get; set; }
+}
+```
+
+The `FormResponse` class includes response metadata:
+
+```csharp /home/daytona/workspace/source/UiMetadataFramework.Core/FormResponseMetadata.cs
+public class FormResponseMetadata
+{
+    public string? Handler { get; internal set; }
+    public IList<ClientFunctionMetadata>? FunctionsToRun { get; set; }
+}
+```
+
+### Response Handlers
+
+The `Handler` property tells the client how to process the response:
+
+```csharp
+// Default: render the output fields
+public class Response : FormResponse
+{
+    // Metadata.Handler = null (uses default "object" handler)
+}
+
+// Custom: use a specific response handler
+public class MessageResponse : FormResponse
+{
+    public MessageResponse() : base("message")
+    {
+        // Metadata.Handler = "message"
+    }
+
+    public string Message { get; set; } = null!;
+}
+```
+
+From the source:
+
+```csharp /home/daytona/workspace/source/UiMetadataFramework.Basic/Response/MessageResponse.cs
+public class MessageResponse : FormResponse
+{
+    public MessageResponse() : base("message")
+    {
+    }
+
+    public string Message { get; set; } = null!;
+}
+```
+
+The client must implement a `"message"` handler that knows how to display messages.
+
+<Note>
+Response handlers allow you to create rich response types like redirects, modals, file downloads, etc.
+</Note>
+
+## Common Response Patterns
+
+### Simple Object Response
+
+Display output fields in a structured layout:
+
+```csharp
+public class Response : FormResponse
+{
+    [OutputField(Label = "User ID")]
+    public int Id { get; set; }
+
+    [OutputField(Label = "Full Name")]
+    public string? FullName { get; set; }
+
+    [OutputField(Label = "Email")]
+    public string? Email { get; set; }
+}
+```
+
+### Message Response
+
+Show a simple message to the user:
+
+```csharp
+public class Response : FormResponse
+{
+    public Response() : base("message")
+    {
+    }
+
+    public string Message { get; set; } = null!;
+}
+
+// Usage in form handler:
+protected override Response Handle(Request request)
+{
+    // Process request...
+    return new Response
+    {
+        Message = "User registered successfully!"
+    };
+}
+```
+
+### Redirect Response
+
+Redirect to another form or URL:
+
+```csharp
+public class Response : FormResponse
+{
+    public Response() : base("redirect")
+    {
+    }
+
+    public string FormId { get; set; } = null!;
+}
+
+// Usage:
+return new Response
+{
+    FormId = "user-details"
+};
+```
+
+### Reload Response
+
+Trigger a form or page reload:
+
+```csharp
+public class Response : FormResponse
+{
+    public Response() : base("reload")
+    {
+    }
+}
+```
+
+## Nullable Output Fields
+
+Output fields often use nullable types since the server may not always have data:
+
+```csharp
+public class Response : FormResponse
+{
+    [OutputField(Label = "Name")]
+    public string? Name { get; set; }  // May be null
+
+    [OutputField(Label = "Birth Date")]
+    public DateTime? BirthDate { get; set; }  // May be null
+
+    [OutputField(Label = "ID")]
+    public int Id { get; set; }  // Always has value
+}
+```
+
+The client should handle null values gracefully (e.g., display empty string or placeholder).
+
+## Custom Output Components
+
+You can create custom output components for complex types:
+
+```csharp
+public class ChartBinding : ComponentBinding
+{
+    public ChartBinding() : base(
+        MetadataBinder.ComponentCategories.Output,
+        serverType: typeof(ChartData),
+        componentType: "chart",
+        metadataFactory: typeof(ChartMetadataFactory))
+    {
+    }
+}
+
+public class ChartData
+{
+    public string[] Labels { get; set; }
+    public int[] Values { get; set; }
+}
+
+// Use in response:
+public class Response : FormResponse
+{
+    [OutputField(Label = "Sales Chart")]
+    public ChartData? SalesData { get; set; }
+}
+```
+
+The client's `"chart"` component renders the data as a visual chart.
+
+## Output Field Metadata
+
+The framework generates the same `FieldMetadata` structure for output fields:
+
+```json
+{
+  "id": "FirstName",
+  "label": "First name",
+  "orderIndex": 1,
+  "hidden": false,
+  "component": {
+    "type": "text",
+    "serverType": "System.String"
+  }
+}
+```
+
+## Response Functions
+
+You can trigger client-side functions when the response is received:
+
+```csharp
+protected override Response Handle(Request request)
+{
+    var response = new Response
+    {
+        Message = "Success!"
+    };
+
+    response.Metadata.FunctionsToRun = new List<ClientFunctionMetadata>
+    {
+        new ClientFunctionMetadata
+        {
+            Id = "show-notification",
+            Parameters = new { Text = "Operation completed" }
+        }
+    };
+
+    return response;
+}
+```
+
+The client will run the `"show-notification"` function before handling the response.
+
+<Tip>
+Use response functions for side effects like showing toasts, playing sounds, or triggering analytics.
+</Tip>
+
+## Best Practices
+
+<CardGroup cols={2}>
+  <Card title="Use Nullable Types" icon="question">
+    Make output fields nullable when data may not be available
+  </Card>
+  <Card title="Consistent Ordering" icon="list-ol">
+    Match `OrderIndex` between input and output for predictable layouts
+  </Card>
+  <Card title="Descriptive Labels" icon="tag">
+    Use clear labels that make sense to end users
+  </Card>
+  <Card title="Hide Sensitive Data" icon="eye-slash">
+    Use `Hidden = true` for data clients need but users shouldn't see
+  </Card>
+</CardGroup>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Input Fields" icon="pen-to-square" href="/concepts/input-fields">
+    Learn about input fields and validation
+  </Card>
+  <Card title="Forms" icon="file-lines" href="/concepts/forms">
+    Understand the complete form structure
+  </Card>
+  <Card title="Metadata Binding" icon="link" href="/concepts/metadata-binding">
+    See how output fields are converted to metadata
+  </Card>
+  <Card title="Creating Forms" icon="file-code" href="/guides/creating-forms">
+    Learn how to build complete forms with outputs
+  </Card>
+</CardGroup>

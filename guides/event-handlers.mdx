@@ -1,0 +1,474 @@
+---
+title: "Event Handlers"
+description: "Working with event handlers in UI Metadata Framework"
+---
+
+Event handlers add interactivity to your forms by allowing fields to respond to user actions and form events. UIMF provides a flexible event handling system for creating dynamic, responsive forms.
+
+## Understanding Event Handlers
+
+Event handlers are attributes that you apply to input or output fields to define behavior that should occur when specific events happen. They allow you to:
+
+- Bind input field values to output field values
+- Update field values based on other field changes
+- Trigger custom client-side behavior
+- Create dynamic, interactive forms
+
+## The BindToOutput Event Handler
+
+The most common event handler is `BindToOutputAttribute`, which automatically populates an input field with a value from an output field.
+
+### Basic Usage
+
+```csharp
+using MediatR;
+using UiMetadataFramework.Basic.EventHandlers;
+using UiMetadataFramework.Basic.Server;
+using UiMetadataFramework.Core.Binding;
+
+public class EditUserRequest : IRequest<EditUserResponse>
+{
+    // Hidden field that gets its value from the output field "UserId"
+    [InputField(Hidden = true)]
+    [BindToOutput("UserId")]
+    public int UserId { get; set; }
+
+    [InputField(Label = "Email", Required = true)]
+    public string? Email { get; set; }
+}
+
+public class EditUserResponse : FormResponse
+{
+    [OutputField(Label = "User ID")]
+    public int UserId { get; set; }
+
+    [OutputField(Label = "Message")]
+    public string Message { get; set; }
+}
+```
+
+### How BindToOutput Works
+
+1. **Form loads** - The form is displayed to the user
+2. **User submits** - The form is submitted and processed
+3. **Response is returned** - The response contains output fields
+4. **Event handler runs** - The `BindToOutput` event handler executes
+5. **Input field is updated** - The input field `UserId` is populated with the value from the output field `UserId`
+
+### Common Use Cases
+
+#### Scenario 1: Multi-Step Workflow
+
+```csharp
+using MediatR;
+using UiMetadataFramework.Basic.EventHandlers;
+using UiMetadataFramework.Basic.Server;
+using UiMetadataFramework.Core.Binding;
+
+// Step 1: Create a user
+public class CreateUserResponse : FormResponse
+{
+    [OutputField(Label = "User ID")]
+    public int NewUserId { get; set; }
+
+    [OutputField(Label = "Message")]
+    public string Message { get; set; }
+}
+
+// Step 2: Add details to the created user
+public class AddUserDetailsRequest : IRequest<AddUserDetailsResponse>
+{
+    // Automatically filled from CreateUserResponse.NewUserId
+    [InputField(Hidden = true)]
+    [BindToOutput("NewUserId")]
+    public int UserId { get; set; }
+
+    [InputField(Label = "Phone number")]
+    public string? PhoneNumber { get; set; }
+
+    [InputField(Label = "Address")]
+    public string? Address { get; set; }
+}
+
+public class AddUserDetailsResponse : FormResponse
+{
+    [OutputField(Label = "Success")]
+    public string Message { get; set; }
+}
+```
+
+#### Scenario 2: Edit Form with Pre-filled Values
+
+```csharp
+using System;
+using MediatR;
+using UiMetadataFramework.Basic.EventHandlers;
+using UiMetadataFramework.Basic.Server;
+using UiMetadataFramework.Core.Binding;
+
+public class LoadUserRequest : IRequest<LoadUserResponse>
+{
+    [InputField(Label = "User ID", Required = true)]
+    public int UserId { get; set; }
+}
+
+public class LoadUserResponse : FormResponse
+{
+    [OutputField(Label = "User ID")]
+    public int UserId { get; set; }
+
+    [OutputField(Label = "Name")]
+    public string Name { get; set; }
+
+    [OutputField(Label = "Email")]
+    public string Email { get; set; }
+}
+
+[Form(Id = "load-user", Label = "Load User", PostOnLoad = false)]
+public class LoadUserForm : Form<LoadUserRequest, LoadUserResponse>
+{
+    protected override LoadUserResponse Handle(LoadUserRequest request)
+    {
+        var user = GetUserFromDatabase(request.UserId);
+
+        return new LoadUserResponse
+        {
+            UserId = user.Id,
+            Name = user.Name,
+            Email = user.Email
+        };
+    }
+}
+
+// The edit form uses BindToOutput to pre-fill values
+public class EditUserRequest : IRequest<EditUserResponse>
+{
+    [InputField(Hidden = true)]
+    [BindToOutput("UserId")]
+    public int UserId { get; set; }
+
+    [InputField(Label = "Name", Required = true)]
+    [BindToOutput("Name")]
+    public string? Name { get; set; }
+
+    [InputField(Label = "Email", Required = true)]
+    [BindToOutput("Email")]
+    public string? Email { get; set; }
+}
+
+public class EditUserResponse : FormResponse
+{
+    [OutputField(Label = "Message")]
+    public string Message { get; set; }
+}
+
+[Form(Id = "edit-user", Label = "Edit User")]
+public class EditUserForm : Form<EditUserRequest, EditUserResponse>
+{
+    protected override EditUserResponse Handle(EditUserRequest request)
+    {
+        UpdateUserInDatabase(request.UserId, request.Name!, request.Email!);
+
+        return new EditUserResponse
+        {
+            Message = "User updated successfully"
+        };
+    }
+}
+```
+
+In this example:
+1. User loads the form with `load-user` and enters a User ID
+2. The form returns user data in the response
+3. The `edit-user` form opens (via FormLink or InlineForm)
+4. Input fields are automatically populated from the `load-user` response using `BindToOutput`
+
+#### Scenario 3: Master-Detail Pattern
+
+```csharp
+using System.Collections.Generic;
+using MediatR;
+using UiMetadataFramework.Basic.EventHandlers;
+using UiMetadataFramework.Basic.Output.InlineForm;
+using UiMetadataFramework.Basic.Server;
+using UiMetadataFramework.Core.Binding;
+
+public class Order
+{
+    public int OrderId { get; set; }
+    public string OrderNumber { get; set; }
+    public decimal Total { get; set; }
+}
+
+public class OrderListResponse : FormResponse
+{
+    [OutputField]
+    public List<Order> Orders { get; set; }
+
+    [OutputField(Label = "View details")]
+    public InlineForm OrderDetailsForm { get; set; }
+}
+
+// The details form receives the selected OrderId via BindToOutput
+public class OrderDetailsRequest : IRequest<OrderDetailsResponse>
+{
+    [InputField(Hidden = true)]
+    [BindToOutput("SelectedOrderId")]
+    public int OrderId { get; set; }
+}
+```
+
+## Event Handler Properties
+
+The `BindToOutputAttribute` has the following properties:
+
+### OutputFieldId
+
+Specifies the ID of the output field to bind to:
+
+```csharp
+[BindToOutput("UserId")] // Binds to output field with ID "UserId"
+public int UserId { get; set; }
+```
+
+### Id
+
+The unique identifier for the event handler (read-only):
+
+```csharp
+public string Id { get; } = "bind-to-output";
+```
+
+### RunAt
+
+Specifies when the event handler should execute (read-only):
+
+```csharp
+public string RunAt { get; } = FormEvents.ResponseHandled;
+```
+
+The event runs after the response has been received and processed.
+
+## Creating Custom Event Handlers
+
+You can create custom event handlers by implementing the `IFieldEventHandlerAttribute` interface:
+
+```csharp
+using System;
+using System.Collections.Generic;
+using System.Reflection;
+using UiMetadataFramework.Core;
+using UiMetadataFramework.Core.Binding;
+
+public class MyCustomEventHandlerAttribute : Attribute, IFieldEventHandlerAttribute
+{
+    public MyCustomEventHandlerAttribute(string parameter)
+    {
+        this.Parameter = parameter;
+    }
+
+    public string Parameter { get; set; }
+
+    public string Id { get; } = "my-custom-handler";
+
+    public string RunAt { get; } = FormEvents.ResponseHandled;
+
+    public bool ApplicableToInputField { get; } = true;
+
+    public bool ApplicableToOutputField { get; } = false;
+
+    public EventHandlerMetadata ToMetadata(PropertyInfo property, MetadataBinder binder)
+    {
+        return new EventHandlerMetadata(this.Id, this.RunAt)
+        {
+            CustomProperties = new Dictionary<string, object?>()
+                .Set(nameof(this.Parameter), this.Parameter)
+        };
+    }
+
+    public bool ApplicableToFieldCategory(string category)
+    {
+        if (category == MetadataBinder.ComponentCategories.Input)
+        {
+            return this.ApplicableToInputField;
+        }
+
+        if (category == MetadataBinder.ComponentCategories.Output)
+        {
+            return this.ApplicableToOutputField;
+        }
+
+        return false;
+    }
+}
+```
+
+Usage:
+
+```csharp
+public class MyRequest
+{
+    [InputField(Label = "Name")]
+    [MyCustomEventHandler("some-parameter")]
+    public string? Name { get; set; }
+}
+```
+
+## Event Handler Application Rules
+
+Event handlers can only be applied to compatible field types:
+
+- **Input field handlers** (like `BindToOutput`) can only be applied to input fields
+- **Output field handlers** can only be applied to output fields
+
+Attempting to apply an event handler to an incompatible field will throw a `BindingException`:
+
+```csharp
+public class InvalidRequest
+{
+    // This will throw BindingException because BindToOutput
+    // is only applicable to input fields
+    [OutputField]
+    [BindToOutput("SomeField")]
+    public string? Name { get; set; }
+}
+```
+
+## Complete Example
+
+Here's a complete example showing a workflow with event handlers:
+
+```csharp
+using System;
+using System.Collections.Generic;
+using MediatR;
+using UiMetadataFramework.Basic.EventHandlers;
+using UiMetadataFramework.Basic.Output.ActionList;
+using UiMetadataFramework.Basic.Output.FormLink;
+using UiMetadataFramework.Basic.Server;
+using UiMetadataFramework.Core.Binding;
+
+// Step 1: Search for a user
+public class SearchUserRequest : IRequest<SearchUserResponse>
+{
+    [InputField(Label = "Email", Required = true)]
+    public string? Email { get; set; }
+}
+
+public class SearchUserResponse : FormResponse
+{
+    [OutputField(Label = "User found")]
+    public bool UserFound { get; set; }
+
+    [OutputField(Label = "User ID")]
+    public int UserId { get; set; }
+
+    [OutputField(Label = "Name")]
+    public string Name { get; set; }
+
+    [OutputField(Label = "Email")]
+    public string Email { get; set; }
+
+    public ActionList Actions { get; set; }
+}
+
+[Form(Id = "search-user", Label = "Search User")]
+public class SearchUserForm : Form<SearchUserRequest, SearchUserResponse>
+{
+    protected override SearchUserResponse Handle(SearchUserRequest request)
+    {
+        var user = FindUserByEmail(request.Email!);
+
+        if (user == null)
+        {
+            return new SearchUserResponse
+            {
+                UserFound = false,
+                Actions = new ActionList()
+            };
+        }
+
+        return new SearchUserResponse
+        {
+            UserFound = true,
+            UserId = user.Id,
+            Name = user.Name,
+            Email = user.Email,
+            Actions = new ActionList(
+                new FormLink
+                {
+                    Form = "update-user",
+                    Label = "Update User",
+                    InputFieldValues = new Dictionary<string, object?>
+                    {
+                        { "UserId", user.Id }
+                    }
+                }
+            )
+        };
+    }
+}
+
+// Step 2: Update the user
+public class UpdateUserRequest : IRequest<UpdateUserResponse>
+{
+    // Hidden field - automatically populated from SearchUserResponse.UserId
+    [InputField(Hidden = true)]
+    [BindToOutput("UserId")]
+    public int UserId { get; set; }
+
+    // Pre-filled from SearchUserResponse.Name
+    [InputField(Label = "Name", Required = true)]
+    [BindToOutput("Name")]
+    public string? Name { get; set; }
+
+    // Pre-filled from SearchUserResponse.Email
+    [InputField(Label = "Email", Required = true)]
+    [BindToOutput("Email")]
+    public string? Email { get; set; }
+}
+
+public class UpdateUserResponse : FormResponse
+{
+    [OutputField(Label = "Success")]
+    public string Message { get; set; }
+
+    // Return UserId for potential further actions
+    [OutputField(Label = "User ID")]
+    public int UserId { get; set; }
+}
+
+[Form(Id = "update-user", Label = "Update User")]
+public class UpdateUserForm : Form<UpdateUserRequest, UpdateUserResponse>
+{
+    protected override UpdateUserResponse Handle(UpdateUserRequest request)
+    {
+        UpdateUserInDatabase(request.UserId, request.Name!, request.Email!);
+
+        return new UpdateUserResponse
+        {
+            Message = $"User {request.Name} updated successfully",
+            UserId = request.UserId
+        };
+    }
+}
+```
+
+## Best Practices
+
+1. **Use Hidden Fields** - When binding IDs or internal values, mark fields as hidden to keep the UI clean
+2. **Consistent Naming** - Use the same field names in request and response classes for easier binding
+3. **Return Useful Data** - Include relevant data in responses that might be needed by subsequent forms
+4. **Chain Workflows** - Use event handlers to create smooth multi-step workflows
+5. **Validate Bound Data** - Always validate data received from event handlers, just like user input
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Custom Properties" icon="wrench" href="/guides/custom-properties">
+    Add custom metadata to forms and fields
+  </Card>
+  <Card title="Creating Forms" icon="file-code" href="/guides/creating-forms">
+    Review form creation basics
+  </Card>
+</CardGroup>

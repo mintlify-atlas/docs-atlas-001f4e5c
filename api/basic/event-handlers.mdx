@@ -1,0 +1,273 @@
+---
+title: Event Handlers
+description: API reference for event handlers in UI Metadata Framework
+---
+
+## Overview
+
+Event handlers allow you to define client-side behavior that responds to form events. They are implemented as attributes that can be applied to input and output fields.
+
+## IFieldEventHandlerAttribute
+
+Interface that all event handler attributes must implement.
+
+<ParamField path="Id" type="string" required>
+  Unique identifier for the event handler
+</ParamField>
+
+<ParamField path="RunAt" type="string" required>
+  The form event at which this handler should execute
+</ParamField>
+
+<ParamField path="ApplicableToInputField" type="bool">
+  Whether this handler can be applied to input fields
+</ParamField>
+
+<ParamField path="ApplicableToOutputField" type="bool">
+  Whether this handler can be applied to output fields
+</ParamField>
+
+### Methods
+
+<ParamField path="ToMetadata(PropertyInfo, MetadataBinder)" type="EventHandlerMetadata">
+  Converts the attribute to event handler metadata
+</ParamField>
+
+<ParamField path="ApplicableToFieldCategory(string)" type="bool">
+  Determines if the handler is applicable to a specific field category
+</ParamField>
+
+## BindToOutputAttribute
+
+Used to bind an input field's value to an output field from a previous response.
+
+<ParamField path="OutputFieldId" type="string" required>
+  ID of the output field to bind to
+</ParamField>
+
+### Properties
+
+<ParamField path="Id" type="string" default="bind-to-output">
+  The event handler identifier
+</ParamField>
+
+<ParamField path="RunAt" type="string" default="FormEvents.ResponseHandled">
+  This handler runs after a form response has been handled
+</ParamField>
+
+<ParamField path="ApplicableToInputField" type="bool" default="true">
+  This handler can only be applied to input fields
+</ParamField>
+
+<ParamField path="ApplicableToOutputField" type="bool" default="false">
+  This handler cannot be applied to output fields
+</ParamField>
+
+### Usage
+
+The `BindToOutputAttribute` is commonly used to create form chains where the output of one form becomes the input to another.
+
+```csharp
+public class SelectUser : Form<SelectUserRequest, SelectUserResponse>
+{
+    public class SelectUserRequest
+    {
+        public int UserId { get; set; }
+    }
+    
+    public class SelectUserResponse
+    {
+        [OutputField("selected-user-id")]
+        public int UserId { get; set; }
+        
+        public string UserName { get; set; }
+    }
+    
+    protected override SelectUserResponse Handle(SelectUserRequest request)
+    {
+        var user = dbContext.Users.Find(request.UserId);
+        return new SelectUserResponse
+        {
+            UserId = user.Id,
+            UserName = user.Name
+        };
+    }
+}
+
+public class EditUser : Form<EditUserRequest, EditUserResponse>
+{
+    public class EditUserRequest
+    {
+        [BindToOutput("selected-user-id")]
+        public int UserId { get; set; }
+        
+        public string Name { get; set; }
+        public string Email { get; set; }
+    }
+    
+    public class EditUserResponse
+    {
+        public string Message { get; set; }
+    }
+    
+    protected override EditUserResponse Handle(EditUserRequest request)
+    {
+        // UserId will be automatically populated from the previous form's output
+        var user = dbContext.Users.Find(request.UserId);
+        user.Name = request.Name;
+        user.Email = request.Email;
+        dbContext.SaveChanges();
+        
+        return new EditUserResponse
+        {
+            Message = "User updated successfully"
+        };
+    }
+}
+```
+
+### Workflow Example
+
+Here's a complete workflow showing how `BindToOutput` enables form chaining:
+
+```csharp
+// Step 1: User selects an item from a list
+public class SelectProduct : Form<SelectProductRequest, SelectProductResponse>
+{
+    public class SelectProductRequest
+    {
+        [Typeahead(typeof(ProductSearchSource))]
+        public TypeaheadValue<int> ProductId { get; set; }
+    }
+    
+    public class SelectProductResponse
+    {
+        [OutputField("product-id")]
+        public int ProductId { get; set; }
+        
+        public string ProductName { get; set; }
+        public decimal Price { get; set; }
+        
+        public FormLink EditProductLink { get; set; }
+    }
+    
+    protected override SelectProductResponse Handle(SelectProductRequest request)
+    {
+        var product = dbContext.Products.Find(request.ProductId.Value);
+        
+        return new SelectProductResponse
+        {
+            ProductId = product.Id,
+            ProductName = product.Name,
+            Price = product.Price,
+            EditProductLink = new FormLink
+            {
+                Form = nameof(EditProduct),
+                Label = "Edit Product",
+                Action = FormLinkActions.OpenModal
+            }
+        };
+    }
+}
+
+// Step 2: Edit form automatically receives the ProductId
+public class EditProduct : Form<EditProductRequest, EditProductResponse>
+{
+    public class EditProductRequest
+    {
+        // This field will be automatically populated with the value
+        // from the "product-id" output field of the previous form
+        [BindToOutput("product-id")]
+        [InputField(Hidden = true)]
+        public int ProductId { get; set; }
+        
+        public string Name { get; set; }
+        public decimal Price { get; set; }
+    }
+    
+    public class EditProductResponse
+    {
+        public string Message { get; set; }
+    }
+    
+    protected override EditProductResponse Handle(EditProductRequest request)
+    {
+        var product = dbContext.Products.Find(request.ProductId);
+        product.Name = request.Name;
+        product.Price = request.Price;
+        dbContext.SaveChanges();
+        
+        return new EditProductResponse
+        {
+            Message = $"Product {product.Name} updated successfully"
+        };
+    }
+}
+```
+
+### Key Benefits
+
+1. **Automatic Data Flow**: Output from one form automatically becomes input to the next
+2. **Hidden Context**: Use `[InputField(Hidden = true)]` to pass data without showing it to users
+3. **Form Composition**: Build complex workflows by chaining simple forms together
+4. **Type Safety**: Maintains C# type safety throughout the form chain
+
+### FormEvents
+
+Common form events that event handlers can respond to:
+
+- `FormEvents.ResponseHandled` - Triggered after a form response has been processed
+- Form events control when handlers execute in the client-side lifecycle
+
+## Creating Custom Event Handlers
+
+You can create custom event handlers by implementing `IFieldEventHandlerAttribute`:
+
+```csharp
+public class CustomEventHandlerAttribute : Attribute, IFieldEventHandlerAttribute
+{
+    public string Id => "custom-handler";
+    public string RunAt => FormEvents.ResponseHandled;
+    public bool ApplicableToInputField => true;
+    public bool ApplicableToOutputField => false;
+    
+    public EventHandlerMetadata ToMetadata(PropertyInfo property, MetadataBinder binder)
+    {
+        return new EventHandlerMetadata(this.Id, this.RunAt)
+        {
+            CustomProperties = new Dictionary<string, object?>
+            {
+                // Add custom properties here
+            }
+        };
+    }
+    
+    public bool ApplicableToFieldCategory(string category)
+    {
+        if (category == MetadataBinder.ComponentCategories.Input)
+        {
+            return this.ApplicableToInputField;
+        }
+        
+        if (category == MetadataBinder.ComponentCategories.Output)
+        {
+            return this.ApplicableToOutputField;
+        }
+        
+        return false;
+    }
+}
+```
+
+### Usage of Custom Handler
+
+```csharp
+public class MyForm : Form<MyRequest, MyResponse>
+{
+    public class MyRequest
+    {
+        [CustomEventHandler]
+        public string MyField { get; set; }
+    }
+}
+```

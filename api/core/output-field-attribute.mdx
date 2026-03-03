@@ -1,0 +1,205 @@
+---
+title: OutputFieldAttribute
+description: Attribute for decorating output fields in form responses
+---
+
+## Overview
+
+`OutputFieldAttribute` is used to decorate properties that represent output fields in form responses. Output fields are used to display data to the user but do not accept input. This attribute extends `FieldAttribute` and is categorized as an output component.
+
+## Namespace
+
+```csharp
+UiMetadataFramework.Core.Binding
+```
+
+## Inheritance
+
+```csharp
+FieldAttribute → OutputFieldAttribute
+```
+
+## Properties
+
+All properties are inherited from `FieldAttribute`:
+
+<ParamField path="Label" type="string">
+  Display label for the field. If not specified, the property name will be used.
+</ParamField>
+
+<ParamField path="Hidden" type="bool" default="false">
+  Indicates whether this field should be visible in the UI. Hidden fields are not displayed to the user.
+</ParamField>
+
+<ParamField path="OrderIndex" type="int" default="0">
+  Controls the rendering position of this field relative to other output fields. Fields are displayed in ascending order of their `OrderIndex` values.
+</ParamField>
+
+<ParamField path="Category" type="string" readonly>
+  Component category that this field attribute supports. For `OutputFieldAttribute`, this is always `"output"`. This property is set by the constructor and cannot be changed.
+</ParamField>
+
+## Usage Examples
+
+### Basic Output Fields
+
+```csharp
+public class UserProfileResponse
+{
+    [OutputField(Label = "User ID")]
+    public int Id { get; set; }
+    
+    [OutputField(Label = "Full Name", OrderIndex = 1)]
+    public string Name { get; set; }
+    
+    [OutputField(Label = "Email Address", OrderIndex = 2)]
+    public string Email { get; set; }
+    
+    [OutputField(Label = "Member Since", OrderIndex = 3)]
+    public DateTime RegistrationDate { get; set; }
+}
+```
+
+### Report with Ordered Fields
+
+```csharp
+public class SalesReportResponse
+{
+    [OutputField(Label = "Report Period", OrderIndex = 1)]
+    public string Period { get; set; }
+    
+    [OutputField(Label = "Total Sales", OrderIndex = 2)]
+    public decimal TotalSales { get; set; }
+    
+    [OutputField(Label = "Number of Orders", OrderIndex = 3)]
+    public int OrderCount { get; set; }
+    
+    [OutputField(Label = "Average Order Value", OrderIndex = 4)]
+    public decimal AverageOrderValue { get; set; }
+    
+    [OutputField(Label = "Top Product", OrderIndex = 5)]
+    public string TopProduct { get; set; }
+}
+```
+
+### Hidden Output Fields
+
+```csharp
+public class DocumentResponse
+{
+    [OutputField(Hidden = true)]
+    public Guid InternalId { get; set; }
+    
+    [OutputField(Label = "Document Title")]
+    public string Title { get; set; }
+    
+    [OutputField(Label = "Content")]
+    public TextOutputValue Content { get; set; }
+    
+    [OutputField(Label = "Last Modified")]
+    public DateTime LastModified { get; set; }
+}
+```
+
+### Complex Output Types
+
+```csharp
+public class DashboardResponse
+{
+    [OutputField(Label = "Statistics", OrderIndex = 1)]
+    public TableValue<StatisticsRow> Statistics { get; set; }
+    
+    [OutputField(Label = "Recent Activity", OrderIndex = 2)]
+    public InlineForm<ActivityList> RecentActivity { get; set; }
+    
+    [OutputField(Label = "Alerts", OrderIndex = 3)]
+    public Alert[] Alerts { get; set; }
+}
+
+public class StatisticsRow
+{
+    [OutputField(Label = "Metric")]
+    public string MetricName { get; set; }
+    
+    [OutputField(Label = "Value")]
+    public string Value { get; set; }
+    
+    [OutputField(Label = "Change")]
+    public string Change { get; set; }
+}
+```
+
+### Form with Input and Output Fields
+
+```csharp
+[Form(Id = "calculate-loan", Label = "Loan Calculator")]
+public class LoanCalculatorForm
+{
+    // Input section
+    [InputField(Label = "Loan Amount", Required = true, OrderIndex = 1)]
+    public decimal LoanAmount { get; set; }
+    
+    [InputField(Label = "Interest Rate (%)", Required = true, OrderIndex = 2)]
+    public decimal InterestRate { get; set; }
+    
+    [InputField(Label = "Loan Term (years)", Required = true, OrderIndex = 3)]
+    public int LoanTermYears { get; set; }
+}
+
+public class LoanCalculatorResponse
+{
+    // Output section
+    [OutputField(Label = "Monthly Payment", OrderIndex = 1)]
+    public decimal MonthlyPayment { get; set; }
+    
+    [OutputField(Label = "Total Interest", OrderIndex = 2)]
+    public decimal TotalInterest { get; set; }
+    
+    [OutputField(Label = "Total Amount", OrderIndex = 3)]
+    public decimal TotalAmount { get; set; }
+    
+    [OutputField(Label = "Amortization Schedule", OrderIndex = 4)]
+    public TableValue<PaymentRow> AmortizationSchedule { get; set; }
+}
+```
+
+### Read-Only Data Display
+
+```csharp
+public class OrderDetailsResponse
+{
+    [OutputField(Label = "Order Number", OrderIndex = 1)]
+    public string OrderNumber { get; set; }
+    
+    [OutputField(Label = "Status", OrderIndex = 2)]
+    public string Status { get; set; }
+    
+    [OutputField(Label = "Order Date", OrderIndex = 3)]
+    public DateTime OrderDate { get; set; }
+    
+    [OutputField(Label = "Items", OrderIndex = 4)]
+    public TableValue<OrderItem> Items { get; set; }
+    
+    [OutputField(Label = "Subtotal", OrderIndex = 5)]
+    public decimal Subtotal { get; set; }
+    
+    [OutputField(Label = "Tax", OrderIndex = 6)]
+    public decimal Tax { get; set; }
+    
+    [OutputField(Label = "Total", OrderIndex = 7)]
+    public decimal Total { get; set; }
+}
+```
+
+## Notes
+
+- Output fields are read-only and used for displaying data to users.
+- The `OrderIndex` property allows you to control the display order of fields.
+- Hidden output fields can be useful for storing metadata that shouldn't be displayed but needs to be included in the response.
+- Output fields support complex types like tables, inline forms, and custom output components.
+
+## See Also
+
+- [FormAttribute](/api/core/form-attribute)
+- [InputFieldAttribute](/api/core/input-field-attribute)
+- [MetadataBinder](/api/core/metadata-binder)

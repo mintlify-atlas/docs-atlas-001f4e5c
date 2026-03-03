@@ -1,0 +1,307 @@
+---
+title: "Creating Forms"
+description: "Step-by-step guide to creating forms with UI Metadata Framework"
+---
+
+Forms are the foundation of UIMF applications. A form consists of a Request class (input fields), a Response class (output fields), and a handler that processes the request.
+
+## Basic Form Structure
+
+Every UIMF form has three main components:
+
+1. **Request class** - Defines input fields that users will fill out
+2. **Response class** - Defines output fields that display results
+3. **Form handler** - Processes the request and returns a response
+
+## Creating Your First Form
+
+<Steps>
+  <Step title="Define the Request class">
+    Create a class to hold your form's input fields:
+
+    ```csharp
+    public class CreateUserRequest : IRequest<CreateUserResponse>
+    {
+        [InputField(Label = "First name", OrderIndex = 1, Required = true)]
+        public string? FirstName { get; set; }
+
+        [InputField(Label = "Last name", OrderIndex = 2, Required = true)]
+        public string? LastName { get; set; }
+
+        [InputField(Label = "Email", OrderIndex = 3, Required = true)]
+        public string? Email { get; set; }
+
+        [InputField(Label = "Age", OrderIndex = 4)]
+        public int? Age { get; set; }
+    }
+    ```
+
+    The `IRequest<TResponse>` interface comes from MediatR and indicates this is a request that returns a response.
+  </Step>
+
+  <Step title="Define the Response class">
+    Create a class to hold your form's output fields:
+
+    ```csharp
+    public class CreateUserResponse : FormResponse
+    {
+        [OutputField(Label = "User ID")]
+        public int UserId { get; set; }
+
+        [OutputField(Label = "Created at")]
+        public DateTime CreatedAt { get; set; }
+
+        [OutputField(Label = "Full name")]
+        public string FullName { get; set; }
+    }
+    ```
+
+    The `FormResponse` base class provides standard form response functionality.
+  </Step>
+
+  <Step title="Implement the form handler">
+    Create a form handler by inheriting from `Form<TRequest, TResponse>`:
+
+    ```csharp
+    using UiMetadataFramework.Basic.Server;
+    using UiMetadataFramework.Core.Binding;
+
+    [Form(Id = "create-user", Label = "Create User", PostOnLoad = false)]
+    public class CreateUserForm : Form<CreateUserRequest, CreateUserResponse>
+    {
+        protected override CreateUserResponse Handle(CreateUserRequest request)
+        {
+            // Your business logic here
+            var userId = SaveUserToDatabase(request);
+
+            return new CreateUserResponse
+            {
+                UserId = userId,
+                CreatedAt = DateTime.UtcNow,
+                FullName = $"{request.FirstName} {request.LastName}"
+            };
+        }
+
+        private int SaveUserToDatabase(CreateUserRequest request)
+        {
+            // Database save logic
+            return 123; // Return generated user ID
+        }
+    }
+    ```
+  </Step>
+
+  <Step title="Add the FormAttribute">
+    The `[Form]` attribute configures how the form behaves:
+
+    ```csharp
+    [Form(
+        Id = "create-user",              // Unique identifier
+        Label = "Create User",            // Display name
+        PostOnLoad = false,               // Don't auto-submit on load
+        CloseOnPostIfModal = true         // Close modal after submit
+    )]
+    ```
+
+    **Key properties:**
+    - `Id` - Unique identifier for the form
+    - `Label` - Display name shown to users
+    - `PostOnLoad` - Auto-submit when loaded (useful for reports)
+    - `PostOnLoadValidation` - Validate before auto-submitting
+    - `CloseOnPostIfModal` - Close modal after successful submission
+  </Step>
+</Steps>
+
+## Async Form Handlers
+
+For operations that require async/await, use `AsyncForm<TRequest, TResponse>`:
+
+```csharp
+using UiMetadataFramework.Basic.Server;
+using System.Threading;
+using System.Threading.Tasks;
+
+[Form(Id = "create-user-async", Label = "Create User")]
+public class CreateUserAsyncForm : AsyncForm<CreateUserRequest, CreateUserResponse>
+{
+    private readonly IUserService _userService;
+
+    public CreateUserAsyncForm(IUserService userService)
+    {
+        _userService = userService;
+    }
+
+    public override async Task<CreateUserResponse> Handle(
+        CreateUserRequest request,
+        CancellationToken cancellationToken)
+    {
+        var userId = await _userService.CreateUserAsync(request, cancellationToken);
+
+        return new CreateUserResponse
+        {
+            UserId = userId,
+            CreatedAt = DateTime.UtcNow,
+            FullName = $"{request.FirstName} {request.LastName}"
+        };
+    }
+}
+```
+
+## Field Validation
+
+Add validation to input fields using the `Required` property:
+
+```csharp
+public class CreateUserRequest : IRequest<CreateUserResponse>
+{
+    // Required field - must have a value
+    [InputField(Label = "Email", Required = true)]
+    public string? Email { get; set; }
+
+    // Optional field
+    [InputField(Label = "Phone number", Required = false)]
+    public string? PhoneNumber { get; set; }
+}
+```
+
+## Controlling Field Order
+
+Use `OrderIndex` to control the order fields appear in the UI:
+
+```csharp
+public class CreateUserRequest : IRequest<CreateUserResponse>
+{
+    [InputField(Label = "First name", OrderIndex = 1)]
+    public string? FirstName { get; set; }
+
+    [InputField(Label = "Last name", OrderIndex = 2)]
+    public string? LastName { get; set; }
+
+    [InputField(Label = "Email", OrderIndex = 3)]
+    public string? Email { get; set; }
+}
+```
+
+Fields with lower `OrderIndex` values appear first.
+
+## Hidden Fields
+
+Hide fields from the UI while still using them in your form logic:
+
+```csharp
+public class UpdateUserRequest : IRequest<UpdateUserResponse>
+{
+    // Hidden field - not shown in UI
+    [InputField(Hidden = true)]
+    public int UserId { get; set; }
+
+    // Visible field
+    [InputField(Label = "New email address")]
+    public string? Email { get; set; }
+}
+```
+
+## Complete Example
+
+Here's a complete working example of a user registration form:
+
+```csharp
+using MediatR;
+using UiMetadataFramework.Basic.Server;
+using UiMetadataFramework.Core;
+using UiMetadataFramework.Core.Binding;
+
+// Request class
+public class RegisterUserRequest : IRequest<RegisterUserResponse>
+{
+    [InputField(Label = "Username", OrderIndex = 1, Required = true)]
+    public string? Username { get; set; }
+
+    [InputField(Label = "Email", OrderIndex = 2, Required = true)]
+    public string? Email { get; set; }
+
+    [InputField(Label = "Password", OrderIndex = 3, Required = true)]
+    public Password? Password { get; set; }
+
+    [InputField(Label = "Age", OrderIndex = 4)]
+    public int? Age { get; set; }
+
+    [InputField(Label = "Newsletter", OrderIndex = 5)]
+    public bool SubscribeToNewsletter { get; set; }
+}
+
+// Response class
+public class RegisterUserResponse : FormResponse
+{
+    [OutputField(Label = "User ID")]
+    public int UserId { get; set; }
+
+    [OutputField(Label = "Registration date")]
+    public DateTime RegisteredAt { get; set; }
+
+    [OutputField(Label = "Welcome message")]
+    public string WelcomeMessage { get; set; }
+}
+
+// Form handler
+[Form(
+    Id = "register-user",
+    Label = "User Registration",
+    PostOnLoad = false,
+    CloseOnPostIfModal = true
+)]
+public class RegisterUserForm : Form<RegisterUserRequest, RegisterUserResponse>
+{
+    private readonly IUserRepository _userRepository;
+
+    public RegisterUserForm(IUserRepository userRepository)
+    {
+        _userRepository = userRepository;
+    }
+
+    protected override RegisterUserResponse Handle(RegisterUserRequest request)
+    {
+        // Validate and create user
+        var user = new User
+        {
+            Username = request.Username!,
+            Email = request.Email!,
+            Password = HashPassword(request.Password!.Value),
+            Age = request.Age,
+            SubscribedToNewsletter = request.SubscribeToNewsletter
+        };
+
+        var userId = _userRepository.Create(user);
+
+        return new RegisterUserResponse
+        {
+            UserId = userId,
+            RegisteredAt = DateTime.UtcNow,
+            WelcomeMessage = $"Welcome, {request.Username}! Your account has been created."
+        };
+    }
+
+    private string HashPassword(string password)
+    {
+        // Password hashing logic
+        return password; // Simplified for example
+    }
+}
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Input Components" icon="keyboard" href="/guides/input-components">
+    Learn about different input field types
+  </Card>
+  <Card title="Output Components" icon="display" href="/guides/output-components">
+    Display data with output components
+  </Card>
+  <Card title="Event Handlers" icon="bolt" href="/guides/event-handlers">
+    Add interactivity with event handlers
+  </Card>
+  <Card title="Custom Properties" icon="wrench" href="/guides/custom-properties">
+    Extend forms with custom metadata
+  </Card>
+</CardGroup>

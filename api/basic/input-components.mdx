@@ -1,0 +1,430 @@
+---
+title: Input Components
+description: API reference for Basic input components in UI Metadata Framework
+---
+
+## Overview
+
+Input components are used to collect user input in forms. The UI Metadata Framework Basic package provides several built-in input component bindings for common data types.
+
+## BooleanInputComponentBinding
+
+Component binding for boolean input fields.
+
+<ParamField path="componentType" type="string" default="boolean">
+  The client-side component type identifier
+</ParamField>
+
+<ParamField path="serverType" type="Type" default="typeof(bool)">
+  The server-side C# type this component binds to
+</ParamField>
+
+### Usage
+
+```csharp
+public class MyForm : Form<MyRequest, MyResponse>
+{
+    public class MyRequest
+    {
+        public bool IsActive { get; set; }
+    }
+}
+```
+
+The `bool` type is automatically mapped to the `boolean` component.
+
+## NumberInputComponentBinding
+
+Component binding for numeric input fields. Supports multiple numeric types.
+
+<ParamField path="componentType" type="string" default="number">
+  The client-side component type identifier
+</ParamField>
+
+<ParamField path="serverTypes" type="Type[]">
+  Supported server-side C# types:
+  - `typeof(int)`
+  - `typeof(decimal)`
+  - `typeof(double)`
+  - `typeof(short)`
+  - `typeof(long)`
+  - `typeof(byte)`
+</ParamField>
+
+### Usage
+
+```csharp
+public class MyForm : Form<MyRequest, MyResponse>
+{
+    public class MyRequest
+    {
+        public int Age { get; set; }
+        public decimal Price { get; set; }
+        public double Rating { get; set; }
+    }
+}
+```
+
+All numeric types are automatically mapped to the `number` component.
+
+## StringInputComponentBinding
+
+Component binding for single-line text input fields.
+
+<ParamField path="componentType" type="string" default="text">
+  The client-side component type identifier
+</ParamField>
+
+<ParamField path="serverType" type="Type" default="typeof(string)">
+  The server-side C# type this component binds to
+</ParamField>
+
+### Usage
+
+```csharp
+public class MyForm : Form<MyRequest, MyResponse>
+{
+    public class MyRequest
+    {
+        public string Name { get; set; }
+        public string Email { get; set; }
+    }
+}
+```
+
+## TextareaValue
+
+Input field type for multiline text.
+
+<ParamField path="Value" type="string?">
+  The value of the textarea input field
+</ParamField>
+
+### Usage
+
+```csharp
+public class MyForm : Form<MyRequest, MyResponse>
+{
+    public class MyRequest
+    {
+        public TextareaValue Description { get; set; }
+    }
+}
+```
+
+The `TextareaValue` type is automatically mapped to the `textarea` component.
+
+## Password
+
+Input field type for password fields. Password values are masked in the UI.
+
+<ParamField path="Value" type="string?">
+  The password value
+</ParamField>
+
+### Usage
+
+```csharp
+public class MyForm : Form<MyRequest, MyResponse>
+{
+    public class MyRequest
+    {
+        public Password UserPassword { get; set; }
+    }
+}
+```
+
+The `Password` type is automatically mapped to the `password` component.
+
+## DateTimeInputComponentBinding
+
+Component binding for date and time input fields.
+
+<ParamField path="componentType" type="string" default="datetime">
+  The client-side component type identifier
+</ParamField>
+
+<ParamField path="serverType" type="Type" default="typeof(DateTime)">
+  The server-side C# type this component binds to
+</ParamField>
+
+### Usage
+
+```csharp
+public class MyForm : Form<MyRequest, MyResponse>
+{
+    public class MyRequest
+    {
+        public DateTime BirthDate { get; set; }
+        public DateTime? MeetingTime { get; set; }
+    }
+}
+```
+
+## DropdownValue&lt;T&gt;
+
+Input field type for dropdown selection components.
+
+<ParamField path="Value" type="T?">
+  The value representing the selected item
+</ParamField>
+
+### Properties
+
+<ParamField path="componentType" type="string" default="dropdown">
+  The client-side component type identifier
+</ParamField>
+
+### Configuration Attributes
+
+The `DropdownValue<T>` type requires configuration using attributes.
+
+#### DropdownAttribute
+
+<ParamField path="Source" type="Type" required>
+  The type that provides dropdown items. Must implement `IDropdownInlineSource` or `ITypeaheadRemoteSource`
+</ParamField>
+
+### Usage
+
+```csharp
+public class MyForm : Form<MyRequest, MyResponse>
+{
+    public class MyRequest
+    {
+        [Dropdown(typeof(CountrySource))]
+        public DropdownValue<int> Country { get; set; }
+    }
+}
+
+public class CountrySource : IDropdownInlineSource
+{
+    public IEnumerable<DropdownItem> GetItems()
+    {
+        return new[]
+        {
+            new DropdownItem("United States", "1"),
+            new DropdownItem("Canada", "2"),
+            new DropdownItem("Mexico", "3")
+        };
+    }
+}
+```
+
+### DropdownItem
+
+<ParamField path="Label" type="string?">
+  Descriptive label for the item displayed to the user
+</ParamField>
+
+<ParamField path="Value" type="string?">
+  Unique identifier for the item
+</ParamField>
+
+### IDropdownInlineSource
+
+Interface for static dropdown data sources.
+
+<ParamField path="GetItems()" type="IEnumerable<DropdownItem>">
+  Returns the list of items for the dropdown. This is assumed to be a static list that doesn't change.
+</ParamField>
+
+### EnumSource&lt;T&gt;
+
+Built-in inline source for enum values.
+
+```csharp
+public enum Status
+{
+    Active,
+    Inactive,
+    Pending
+}
+
+public class MyForm : Form<MyRequest, MyResponse>
+{
+    public class MyRequest
+    {
+        [Dropdown(typeof(EnumSource<Status>))]
+        public DropdownValue<Status> Status { get; set; }
+    }
+}
+```
+
+The enum values are automatically humanized for display (e.g., "PendingApproval" becomes "Pending Approval").
+
+## TypeaheadValue&lt;T&gt;
+
+Input field type for typeahead (autocomplete) components.
+
+<ParamField path="Value" type="T?">
+  The value representing the selected item
+</ParamField>
+
+### Properties
+
+<ParamField path="componentType" type="string" default="typeahead">
+  The client-side component type identifier
+</ParamField>
+
+### Configuration Attributes
+
+#### TypeaheadAttribute
+
+<ParamField path="Source" type="Type" required>
+  The type that provides typeahead items. Must implement `ITypeaheadRemoteSource` or `IDropdownInlineSource`
+</ParamField>
+
+### Usage
+
+```csharp
+public class MyForm : Form<MyRequest, MyResponse>
+{
+    public class MyRequest
+    {
+        [Typeahead(typeof(UserSearchSource))]
+        public TypeaheadValue<int> UserId { get; set; }
+    }
+}
+
+public class UserSearchSource : ITypeaheadRemoteSource
+{
+    // Implementation handled by the framework
+}
+```
+
+### TypeaheadItem&lt;T&gt;
+
+<ParamField path="Label" type="string?">
+  Descriptive label for the item displayed to the user
+</ParamField>
+
+<ParamField path="Value" type="T?">
+  Unique identifier for the item
+</ParamField>
+
+### ITypeaheadRemoteSource
+
+Marker interface for remote typeahead data sources. Classes implementing this interface provide dynamic item lists based on user queries.
+
+```csharp
+public class UserSearchSource : ITypeaheadRemoteSource
+{
+    // Framework automatically handles the remote source logic
+}
+```
+
+## MultiSelect&lt;T&gt;
+
+Input field type for selecting multiple values.
+
+<ParamField path="Items" type="IList<T>?">
+  The list of selected items
+</ParamField>
+
+### Properties
+
+<ParamField path="componentType" type="string" default="multiselect">
+  The client-side component type identifier
+</ParamField>
+
+### Usage
+
+```csharp
+public class MyForm : Form<MyRequest, MyResponse>
+{
+    public class MyRequest
+    {
+        public MultiSelect<int> SelectedCategories { get; set; }
+    }
+}
+```
+
+You can also initialize with default values:
+
+```csharp
+var multiSelect = new MultiSelect<int>(1, 2, 3);
+```
+
+## Paginator
+
+Input component for controlling pagination parameters of paginated data.
+
+<ParamField path="PageIndex" type="int?">
+  Page number to retrieve. If null, the first page will be retrieved
+</ParamField>
+
+<ParamField path="PageSize" type="int?">
+  Number of records to retrieve per page. If null, the default page size will be used
+</ParamField>
+
+<ParamField path="OrderBy" type="string?">
+  The name of the property by which results should be sorted
+</ParamField>
+
+<ParamField path="Ascending" type="bool?">
+  The sort order. Works in combination with `OrderBy`. If null, no special order will be applied
+</ParamField>
+
+### Properties
+
+<ParamField path="componentType" type="string" default="paginator">
+  The client-side component type identifier
+</ParamField>
+
+<ParamField path="AlwaysHidden" type="bool" default="true">
+  This component is always hidden from the user interface
+</ParamField>
+
+### Usage
+
+```csharp
+public class SearchUsers : Form<SearchRequest, SearchResponse>
+{
+    public class SearchRequest
+    {
+        public Paginator Paginator { get; set; }
+        public string Query { get; set; }
+    }
+    
+    public class SearchResponse
+    {
+        [PaginatedData(nameof(SearchRequest.Paginator))]
+        public PaginatedData<UserDto> Results { get; set; }
+    }
+}
+```
+
+## RemoteSourceArgumentAttribute
+
+Configures parameters for remote sources (typeahead and dropdown with remote data).
+
+<ParamField path="Parameter" type="string" required>
+  Name of the request parameter on the remote source
+</ParamField>
+
+<ParamField path="Source" type="string" required>
+  Name of the source from which to take the value for the parameter
+</ParamField>
+
+<ParamField path="SourceType" type="string" required>
+  Type of source specified by Source
+</ParamField>
+
+### Usage
+
+```csharp
+public class MyForm : Form<MyRequest, MyResponse>
+{
+    public class MyRequest
+    {
+        public int CategoryId { get; set; }
+        
+        [Typeahead(typeof(ProductSearchSource))]
+        [RemoteSourceArgument("categoryId", nameof(CategoryId), "input")]
+        public TypeaheadValue<int> ProductId { get; set; }
+    }
+}
+```
+
+This configuration ensures that when the typeahead queries the remote source, it passes the current value of `CategoryId` as a parameter.

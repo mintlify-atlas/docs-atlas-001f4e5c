@@ -1,0 +1,155 @@
+---
+title: InputFieldAttribute
+description: Attribute for decorating input fields in forms
+---
+
+## Overview
+
+`InputFieldAttribute` is used to decorate properties that represent input fields in forms. It extends `FieldAttribute` with additional functionality specific to user input, such as making fields required.
+
+## Namespace
+
+```csharp
+UiMetadataFramework.Core.Binding
+```
+
+## Inheritance
+
+```csharp
+FieldAttribute → InputFieldAttribute
+```
+
+## Properties
+
+### InputFieldAttribute-Specific Properties
+
+<ParamField path="Required" type="bool" default="false">
+  Indicates whether a value for this input field is required before submitting the form. When set to `true`, the form cannot be submitted until the user provides a value.
+</ParamField>
+
+### Inherited Properties from FieldAttribute
+
+<ParamField path="Label" type="string">
+  Display label for the field. If not specified, the property name will be used.
+</ParamField>
+
+<ParamField path="Hidden" type="bool" default="false">
+  Indicates whether this field should be visible in the UI. Hidden fields are still part of the form but not displayed to the user.
+</ParamField>
+
+<ParamField path="OrderIndex" type="int" default="0">
+  Controls the rendering position of this field relative to other input fields. Fields are displayed in ascending order of their `OrderIndex` values.
+</ParamField>
+
+<ParamField path="Category" type="string" readonly>
+  Component category that this field attribute supports. For `InputFieldAttribute`, this is always `"input"`. This property is set by the constructor and cannot be changed.
+</ParamField>
+
+## Usage Examples
+
+### Basic Input Fields
+
+```csharp
+[Form(Id = "contact-form", Label = "Contact Us")]
+public class ContactForm
+{
+    [InputField(Label = "Your Name", Required = true, OrderIndex = 1)]
+    public string Name { get; set; }
+    
+    [InputField(Label = "Email Address", Required = true, OrderIndex = 2)]
+    public string Email { get; set; }
+    
+    [InputField(Label = "Message", Required = true, OrderIndex = 3)]
+    public string Message { get; set; }
+}
+```
+
+### Hidden Fields
+
+```csharp
+[Form(Id = "edit-profile")]
+public class EditProfileForm
+{
+    [InputField(Hidden = true)]
+    public int UserId { get; set; }
+    
+    [InputField(Label = "First Name", Required = true)]
+    public string FirstName { get; set; }
+    
+    [InputField(Label = "Last Name", Required = true)]
+    public string LastName { get; set; }
+}
+```
+
+### Ordered Fields
+
+```csharp
+[Form(Id = "registration")]
+public class RegistrationForm
+{
+    [InputField(Label = "Email", Required = true, OrderIndex = 1)]
+    public string Email { get; set; }
+    
+    [InputField(Label = "Password", Required = true, OrderIndex = 2)]
+    public string Password { get; set; }
+    
+    [InputField(Label = "Confirm Password", Required = true, OrderIndex = 3)]
+    public string ConfirmPassword { get; set; }
+    
+    [InputField(Label = "Accept Terms", Required = true, OrderIndex = 4)]
+    public bool AcceptTerms { get; set; }
+}
+```
+
+### Mixed Required and Optional Fields
+
+```csharp
+[Form(Id = "job-application")]
+public class JobApplicationForm
+{
+    [InputField(Label = "Full Name", Required = true, OrderIndex = 1)]
+    public string FullName { get; set; }
+    
+    [InputField(Label = "Email", Required = true, OrderIndex = 2)]
+    public string Email { get; set; }
+    
+    [InputField(Label = "Phone", Required = false, OrderIndex = 3)]
+    public string Phone { get; set; }
+    
+    [InputField(Label = "LinkedIn Profile", Required = false, OrderIndex = 4)]
+    public string LinkedInUrl { get; set; }
+    
+    [InputField(Label = "Resume", Required = true, OrderIndex = 5)]
+    public FileValue Resume { get; set; }
+}
+```
+
+### Complex Types with Custom Components
+
+```csharp
+[Form(Id = "advanced-form")]
+public class AdvancedForm
+{
+    [InputField(Required = true)]
+    public DateTime SubmissionDate { get; set; }
+    
+    [InputField(Required = false)]
+    public TextareaValue Notes { get; set; }
+    
+    [InputField(Required = true)]
+    public Dropdown<string> Category { get; set; }
+}
+```
+
+## Notes
+
+- The `Required` property only affects client-side validation. Server-side validation should still be implemented.
+- Fields with `Hidden = true` are still included in form submissions but are not displayed to users.
+- The `OrderIndex` property allows you to control field order without rearranging property declarations in your code.
+- If `Label` is not specified, the framework will use the property name as the label.
+
+## See Also
+
+- [FormAttribute](/api/core/form-attribute)
+- [OutputFieldAttribute](/api/core/output-field-attribute)
+- [MetadataBinder](/api/core/metadata-binder)

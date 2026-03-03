@@ -1,0 +1,180 @@
+---
+title: Creating Custom Components
+description: Learn how to create custom input and output component bindings for UI Metadata Framework
+---
+
+Custom components are the building blocks of UIMF. They define how server-side types are rendered on the client and how metadata is generated for each component type.
+
+## Understanding Component Bindings
+
+A component binding connects a server-side type to a client-side UI control. The framework uses the `IComponentBinding` interface to define these mappings.
+
+### IComponentBinding Interface
+
+The `IComponentBinding` interface (source:UiMetadataFramework.Core/Binding/Component/IComponentBinding.cs:11) defines the contract for component bindings:
+
+```csharp
+public interface IComponentBinding
+{
+    // Component which will be rendered
+    string ComponentType { get; }
+    
+    // The server-side types being bound
+    IEnumerable<Type> ServerTypes { get; }
+    
+    // Metadata factory for constructing component metadata
+    Type? MetadataFactory { get; }
+    
+    // Allowed configurations for the component
+    HasConfigurationAttribute[] AllowedConfigurations { get; }
+    
+    // Additional data associated with this component type
+    IReadOnlyDictionary<string, object?>? AdditionalData { get; }
+}
+```
+
+## Creating Custom Input Components
+
+Input components represent user input fields like text boxes, dropdowns, date pickers, etc.
+
+### Step 1: Create the Component Attribute
+
+First, create an attribute that extends `ComponentAttribute`:
+
+```csharp
+using UiMetadataFramework.Core.Binding;
+
+public class MyInputComponentAttribute : ComponentAttribute
+{
+    public MyInputComponentAttribute(string name, Type? metadataFactory = null)
+        : base(MetadataBinder.ComponentCategories.Input, name, metadataFactory)
+    {
+    }
+    
+    public bool AlwaysHidden { get; set; }
+    public string? DefaultLabel { get; set; }
+    
+    public override IReadOnlyDictionary<string, object?> GetAdditionalData()
+    {
+        return new Dictionary<string, object?>
+        {
+            { nameof(AlwaysHidden), AlwaysHidden },
+            { nameof(DefaultLabel), DefaultLabel }
+        };
+    }
+}
+```
+
+This example is from UiMetadataFramework.Basic (source:UiMetadataFramework.Basic/Inputs/MyInputComponentAttribute.cs:9). The `GetAdditionalData()` method allows you to attach custom metadata to the component.
+
+### Step 2: Create the Value Type
+
+Create a class that will hold the component's value:
+
+```csharp
+[MyInputComponent("dropdown", typeof(DropdownMetadataFactory))]
+[HasConfiguration(typeof(DropdownAttribute), mandatory: true)]
+[HasConfiguration(typeof(RemoteSourceArgumentAttribute), isArray: true, name: "Parameters")]
+public class DropdownValue<T>
+{
+    public T? Value { get; set; }
+}
+```
+
+This example from UiMetadataFramework.Basic (source:UiMetadataFramework.Basic/Inputs/Dropdown/DropdownValue.cs:12) shows:
+- The component attribute decorating the type
+- A custom metadata factory for complex metadata generation
+- Configuration attributes defining what customizations are allowed
+
+### Step 3: Register the Component
+
+Register your component assembly with the `MetadataBinder`:
+
+```csharp
+var binder = new MetadataBinder();
+binder.RegisterAssembly(typeof(MyInputComponentAttribute).Assembly);
+```
+
+## Creating Custom Output Components
+
+Output components represent rendered results like tables, charts, text displays, etc.
+
+### Example: Action List Component
+
+Here's a simple output component from UiMetadataFramework.Basic (source:UiMetadataFramework.Basic/Output/ActionList/ActionList.cs:10):
+
+```csharp
+[MyOutputComponent("action-list")]
+public class ActionList
+{
+    public ActionList(params FormLink[] actions)
+    {
+        Actions = actions.ToList();
+    }
+    
+    public IList<FormLink> Actions { get; set; }
+}
+```
+
+### Output Component Attribute
+
+The output component attribute is similar to the input version:
+
+```csharp
+public class MyOutputComponentAttribute : ComponentAttribute
+{
+    public MyOutputComponentAttribute(string name, Type? metadataFactory = null)
+        : base(MetadataBinder.ComponentCategories.Output, name, metadataFactory)
+    {
+    }
+    
+    public int DefaultOrderIndex { get; set; }
+    public bool NoLabelByDefault { get; set; }
+    
+    public override IReadOnlyDictionary<string, object?> GetAdditionalData()
+    {
+        return new Dictionary<string, object?>
+        {
+            { nameof(NoLabelByDefault), NoLabelByDefault },
+            { nameof(DefaultOrderIndex), DefaultOrderIndex }
+        };
+    }
+}
+```
+
+## Component Configuration
+
+Components can accept configuration through `ComponentConfigurationAttribute` classes. Use `HasConfigurationAttribute` to declare allowed configurations:
+
+```csharp
+[MyInputComponent("dropdown", typeof(DropdownMetadataFactory))]
+[HasConfiguration(typeof(DropdownAttribute), mandatory: true)]
+public class DropdownValue<T>
+{
+    // ...
+}
+```
+
+Configuration properties are marked with `ConfigurationPropertyAttribute`:
+
+```csharp
+public class DropdownAttribute : ComponentConfigurationAttribute
+{
+    [ConfigurationProperty("Source")]
+    public Type? Source { get; set; }
+}
+```
+
+## Best Practices
+
+1. **Use meaningful component names**: The component name (e.g., "dropdown", "action-list") must match what the client expects
+2. **Include metadata factories for complex components**: Use custom factories when you need to transform or augment the default metadata
+3. **Document additional data**: Use `GetAdditionalData()` to expose component-specific metadata to clients
+4. **Keep components focused**: Each component should have a single, clear responsibility
+5. **Use configuration attributes**: Make components configurable through attributes rather than hardcoding behavior
+
+## Next Steps
+
+- Learn how to create [custom metadata factories](/advanced/metadata-factories) for complex components
+- Understand [dependency injection](/advanced/dependency-injection) in UIMF
+- See how to [integrate with frontend clients](/advanced/client-integration)
