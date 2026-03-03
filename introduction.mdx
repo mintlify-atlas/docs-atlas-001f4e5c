@@ -43,7 +43,7 @@ With UIMF, you define your forms once on the backend using attributes, and the f
 Your frontend can then consume this metadata to dynamically generate the appropriate UI.
 
 <Note>
-UIFM uses a protocol-based approach, meaning you can implement the frontend in any framework. The official [uimf-svelte](https://github.com/unops/uimf-svelte) client demonstrates this with Svelte.
+UIMF uses a protocol-based approach, meaning you can implement the frontend in any framework. The official [uimf-svelte](https://github.com/unops/uimf-svelte) client demonstrates this with Svelte.
 </Note>
 
 ## Example
@@ -79,7 +79,7 @@ public class AddNumbers : Form<AddNumbers.Request, AddNumbers.Response>
 }
 ```
 
-UIFM automatically generates metadata describing this form:
+UIMF automatically generates metadata describing this form:
 
 ```json
 {
@@ -140,7 +140,7 @@ Your frontend client receives this metadata and renders the appropriate form wit
 
 ## Architecture
 
-UIFM consists of two main packages:
+UIMF consists of two main packages:
 
 - **UiMetadataFramework.Core** - Core concepts and building blocks for creating your own UIMF backend
 - **UiMetadataFramework.Basic** - Example component library with common input/output components
