@@ -1,0 +1,125 @@
+{
+  "projectType": "framework",
+  "projectName": "UI Metadata Framework",
+  "projectDescription": "A client-server communication protocol that allows clients to generate user interfaces based on metadata provided by the server.",
+  "theme": "palm",
+  "primaryColor": "#2563eb",
+  "lightColor": "#60a5fa",
+  "darkColor": "#1e40af",
+  "navigation": {
+    "tabs": [
+      {
+        "tab": "Documentation",
+        "groups": [
+          {
+            "group": "Get Started",
+            "pages": [
+              "introduction",
+              "quickstart",
+              "installation"
+            ]
+          },
+          {
+            "group": "Core Concepts",
+            "pages": [
+              "concepts/overview",
+              "concepts/forms",
+              "concepts/input-fields",
+              "concepts/output-fields",
+              "concepts/metadata-binding"
+            ]
+          },
+          {
+            "group": "Building with UIMF",
+            "pages": [
+              "guides/creating-forms",
+              "guides/input-components",
+              "guides/output-components",
+              "guides/event-handlers",
+              "guides/custom-properties"
+            ]
+          },
+          {
+            "group": "Component Library",
+            "pages": [
+              "components/input-components",
+              "components/output-components"
+            ]
+          },
+          {
+            "group": "Advanced",
+            "pages": [
+              "advanced/custom-components",
+              "advanced/metadata-factories",
+              "advanced/dependency-injection",
+              "advanced/client-integration"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "API Reference",
+        "groups": [
+          {
+            "group": "Core API",
+            "pages": [
+              "api/core/form-attribute",
+              "api/core/input-field-attribute",
+              "api/core/output-field-attribute",
+              "api/core/component-binding",
+              "api/core/metadata-binder"
+            ]
+          },
+          {
+            "group": "Basic Components",
+            "pages": [
+              "api/basic/input-components",
+              "api/basic/output-components",
+              "api/basic/event-handlers"
+            ]
+          },
+          {
+            "group": "TypeScript API",
+            "pages": [
+              "api/typescript/form-metadata",
+              "api/typescript/field-metadata"
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "keyFeatures": [
+    "Metadata-driven UI generation",
+    "Strongly-typed form definitions",
+    "Extensible component system",
+    "Automatic metadata generation via reflection",
+    "Client-server protocol for dynamic UIs",
+    "Built-in input and output components",
+    "Custom component and property support",
+    "TypeScript type definitions"
+  ],
+  "publicApiSurface": [
+    "FormAttribute",
+    "InputFieldAttribute",
+    "OutputFieldAttribute",
+    "IForm<TRequest, TResponse>",
+    "ComponentAttribute",
+    "ComponentBinding",
+    "MetadataBinder",
+    "BindingCollection",
+    "FormMetadata",
+    "InputFieldMetadata",
+    "OutputFieldMetadata",
+    "BooleanInputComponentBinding",
+    "NumberInputComponentBinding",
+    "StringInputComponentBinding",
+    "TextareaInputFieldBinding",
+    "DropdownAttribute",
+    "TypeaheadRemoteSource",
+    "ActionListAttribute",
+    "TableAttribute",
+    "PaginatedDataAttribute",
+    "BindToOutputAttribute"
+  ]
+}
